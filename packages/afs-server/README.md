@@ -19,8 +19,18 @@ Store layer (in progress):
   `CatalogStore` over the single-table schema (`AFS_DYNAMODB_ENDPOINT_URL` points
   at DynamoDB Local for dev).
 
-Both stores are certified by the afs-core conformance kits via `moto`. Coming
-next: the read-path services + the thin REST/MCP app.
+Both stores are certified by the afs-core conformance kits via `moto`.
+
+- `afs_server.services.FsService` — the read path (`list` / `stat` / ranged
+  `read`) over the stores, with scope + namespace enforcement and 404-not-403
+  misses.
+- `afs_server.app` — the FastAPI app: `/v1/healthz`, `/readyz`, `/me`, and
+  `fs/{ns}/{entries,stat,doc}`; dev auth (static principal, never prod); every
+  `AfsError` rendered as RFC 9457 `problem+json`.
+
+The image (`../../Dockerfile`) runs this app on Lambda / Fargate / locally; `docker
+compose up` from the repo root runs it against MinIO + DynamoDB Local. Coming
+next: the MCP mount (shares `FsService` in-process).
 
 ## Swapping a backend (plug-and-play)
 

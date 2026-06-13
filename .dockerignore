@@ -1,0 +1,33 @@
+# Keep the build context small and secret-free. NOTE: package READMEs are NOT
+# ignored — hatchling reads them as project metadata during the build.
+
+.git
+.github
+.venv
+**/.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.ty_cache
+
+# Infra + docs are not part of the app image
+terraform
+docs
+
+# Local env / secrets — never into an image layer
+.env
+.env.*
+*.secret.*
+*.pem
+
+# Editor / OS
+.idea
+.vscode
+.DS_Store
+
+# Compose + Dockerfiles themselves
+docker-compose*.yml
+Dockerfile*
+.dockerignore
