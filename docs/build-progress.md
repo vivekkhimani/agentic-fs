@@ -22,10 +22,16 @@ lands into a pipeline and a data model already proven safe.
 | `agentic-fs-terraform-{plan,apply}` (IAM) + `agentic-fs-ci-boundary` | Safe, least-privilege CI delivery — guardrails before payload |
 | `alias/agentic-fs-data` → CMK | **SSE-KMS everywhere** — the encryption floor of the security model |
 | `agentic-fs-data-…` (S3) | **S3 is canonical** — the single source of truth the whole system heals from |
+| `agentic-fs-catalog` (DynamoDB) | The **derived index** of S3 — fast `list`/`glob`/`stat`; healable; first-class `catalog_only` |
 
-Four resources, all `Project=agentic-fs`-tagged → the entire footprint is
-discoverable and tearable-down by one tag query. That property was a design goal
-from day one, not an afterthought.
+Five tag-discoverable resources (`Project=agentic-fs`), so the entire footprint
+is teardown-by-one-query — a design goal from day one, not an afterthought.
+(IAM roles are tagged too but the Resource Groups Tagging API can't enumerate
+IAM, so the live count via that API shows the four non-IAM resources + the
+boundary policy.)
+
+**All M1 stateful dependencies now exist** — CMK + data bucket + catalog — so the
+serving layer (`compute_lambda`) can be built against real backends.
 
 ## How the infrastructure maps to the architecture
 
@@ -37,8 +43,8 @@ Status against each:
 | Deploy/CI/state/identity | `global/bootstrap`, `global/ci-roles`, `.github/workflows` | ✅ done | "Deploys into your AWS account" — and lets us iterate without blast radius |
 | Data bucket (`tenants/`+`derived/`+`scratch/`) | `storage` | ✅ done | **S3 is canonical; everything else is derived and healable from it** (the load-bearing principle) |
 | Encryption / tenancy floor | `kms` | ✅ done | **Multi-tenant, enterprise-secure by default** — SSE-KMS on every object |
-| Catalog (list/glob/stat index) | `catalog_dynamodb` (default) / `catalog_postgres` | ⏭️ **next** | The **derived index** of S3 — navigation without O(corpus) S3 LISTs; healable; **swappable** |
-| Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | M1 | **MCP-first, agent-shaped** — Function URL streaming + OAuth resource server + enforcement boundary |
+| Catalog (list/glob/stat index) | `catalog_dynamodb` (default) / `catalog_postgres` | ✅ done | The **derived index** of S3 — navigation without O(corpus) S3 LISTs; healable; **swappable** |
+| Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | ⏭️ **next** | **MCP-first, agent-shaped** — Function URL streaming + OAuth resource server + enforcement boundary |
 | Ingest → extract → heal | `ingestion` | M2 | **S3 events drive a serverless pipeline**; the reconciler *is* "rebuildable from S3" |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
 | OAuth IdP (optional) | `auth_cognito` | M1/opt | OAuth 2.1 resource server, batteries-included, $0 under free tier |
@@ -53,9 +59,9 @@ it — so the system is demoable at every step (plan §15).
   boundary, CI (validate → plan → gated sandbox apply → weekly drift), tflint +
   trivy gates, tagging, module/example scaffolds.
 - **M0 — Foundation** ✅ — `kms` + `storage`. S3-is-canonical is now real.
-- **M1 — Read path** ⏭️ — `catalog_dynamodb` (this wave) → `compute_lambda` +
-  dev auth → an agent can `list`/`read` a seeded corpus over MCP. *Exit:* Claude
-  Desktop reads the corpus end-to-end.
+- **M1 — Read path** 🔧 in progress — `catalog_dynamodb` ✅ done →
+  `compute_lambda` (next) + dev auth → an agent can `list`/`read` a seeded corpus
+  over MCP. *Exit:* Claude Desktop reads the corpus end-to-end.
 - **M2 — Ingestion & extraction** — `ingestion` (EventBridge → SQS → Docling
   extractor → `derived/` + catalog rows) + the reconciler. *Exit:* a corrupt PDF
   lands `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
@@ -83,23 +89,29 @@ ci-roles change**. The one rule to remember: any module that creates an IAM role
 (first: `compute_lambda` in M1) must set `permissions_boundary` to the
 `permissions_boundary_arn` output, or the boundary denies its creation.
 
-## Next wave: `catalog_dynamodb`
+## Next wave: `compute_lambda` (the serving surface)
 
-**What:** a single DynamoDB table (`PAY_PER_REQUEST`, PITR, deletion protection,
-SSE-KMS with the project CMK, TTL on `expires_at`) with three GSIs
-(`by_doc`, `by_checksum`, sparse `by_extraction_status`) — the schema in plan
-§5.1.
+With the bucket + CMK + catalog in place, the next piece is the API/MCP serving
+layer: an `agentic-fs-api` Lambda behind a streaming **Function URL**, its
+execution role, and a log group. This is the **MCP-first** pillar made real — the
+first thing an agent actually talks to.
 
-**Why it's next:** the catalog is the **derived index** that turns S3 into a
-navigable filesystem — `list`/`glob`/`stat` answer from the catalog instead of
-listing the bucket, and `catalog_only` is a first-class row so a document we
-can't extract is still listed and cite-able (**catalog-only degradation**). It's
-the last stateful dependency before the serving layer can answer read-path calls.
+Two things make this step distinct from M0/M1:
 
-**How it ties in:** it reuses the M0 CMK (`module.kms.key_arn`), is healable from
-the M0 bucket (the M2 reconciler diffs the two), and proves the **pluggability**
-pillar — the same `CatalogStore` contract is implemented twice (DynamoDB default,
-Postgres alt). No ci-roles change (DynamoDB is covered by PowerUser in-region).
+1. **First IAM-role-creating module.** The Lambda execution role is where the
+   permissions-boundary rule first applies: the module takes a
+   `permissions_boundary_arn` variable and sets it on the role, and the
+   quickstart root threads the `ci-roles` `permissions_boundary_arn` output
+   through. (Designed for — see `terraform/DECISIONS.md` §2a.)
+2. **Needs a container image.** The real Lambda is the FastAPI/FastMCP app
+   (`afs-server`), which doesn't exist yet. So there's a fork:
+   - **(a) infra-complete, image-deferred** — build the full module against a
+     placeholder image so it `plan`s/`apply`s now and is boundary-validated
+     end-to-end; point it at the real image once the app lands. *Keeps the
+     infra-first cadence.*
+   - **(b) pivot to the app packages** (`afs-core` / `afs-server`) so there's a
+     real image to deploy, then return and wire compute.
 
-**Then:** `compute_lambda` makes the catalog + bucket reachable by an agent over
-MCP — the first end-to-end "agent reads your docs" moment.
+Recommendation: **(a)** — finish provisioning the serverless spine and prove the
+boundary requirement, then swap in the real image. To be confirmed before we
+start (brainstorm pending).

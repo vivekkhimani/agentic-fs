@@ -6,14 +6,15 @@ Infrastructure for agentic-fs, fully modularized and deployed with one
 tearable-down by tag — even while it shares the existing Seamind AWS account
 (`002988089284`) during the trial phase.
 
-> **Skeleton status.** This is the guardrail + pipeline layer. The state
-> backend and CI roles are real and applyable; the application modules under
-> [`modules/`](modules/) are scaffolds (README contracts only) and the
-> [`examples/quickstart`](examples/quickstart) root composes none of them yet,
-> so it plans to *no changes*. That's deliberate: it lets the entire pipeline
-> (fmt → validate → tflint → trivy → plan → gated apply → drift) be proven green
-> before the first real resource lands. Modules are filled in milestone by
-> milestone (`docs/agentic-fs-oss-plan.md` §15).
+> **Status (live).** The guardrail + pipeline layer is in place and the first
+> real modules are applied to the sandbox: `kms`, `storage`, and
+> `catalog_dynamodb` are implemented and composed in
+> [`examples/quickstart`](examples/quickstart) (5 resources live). The remaining
+> modules under [`modules/`](modules/) are still scaffolds (README contracts),
+> filled in milestone by milestone (`docs/agentic-fs-oss-plan.md` §15; live
+> progress in [`docs/build-progress.md`](../docs/build-progress.md)). Every slice
+> goes through the same pipeline: fmt → validate → tflint → trivy → read-only
+> plan → gated sandbox apply → drift.
 
 ## Layout
 

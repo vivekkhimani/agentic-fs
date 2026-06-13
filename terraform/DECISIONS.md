@@ -93,3 +93,19 @@ exists.
 a no-op root means the first real resource lands into a pipeline already known to
 be green and correctly permissioned — guardrails before payload, exactly the
 order requested.
+
+## 7. Generate module HCL against the live provider registry, not from memory
+
+**Decision.** When authoring a module, verify the resource schema against the
+pinned provider version in the Terraform registry rather than relying on
+remembered syntax. Treat `terraform validate` **deprecation warnings** as
+must-fix, not noise.
+
+**Why.** Writing `catalog_dynamodb` from memory produced the older
+`global_secondary_index { hash_key/range_key }` form, which the pinned AWS
+provider (6.50.0) flags as deprecated in favor of `key_schema` blocks. CI's
+`validate` step passes on warnings, so this would have silently shipped
+soon-to-break syntax. Checking the 6.50.0 registry docs gave the current form and
+kept `validate` warning-free. For an OSS repo where contributors (and agents)
+generate Terraform, "registry-verified + zero deprecation warnings" is the
+standard — it keeps the codebase forward-compatible and the signal clean.
