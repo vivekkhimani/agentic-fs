@@ -9,10 +9,14 @@
 #                               repo (so fork-PR plans work — they get no write
 #                               power).
 #
-#   agentic-fs-terraform-apply  read (ReadOnlyAccess) + a SCOPED set of writes
-#                               for the resource types Terraform actually
-#                               manages (widened per milestone). Assumable ONLY
-#                               from the gated `sandbox` GitHub Environment.
+#   agentic-fs-terraform-apply  read (ReadOnlyAccess) + broad writes
+#                               (PowerUserAccess + scoped IAM writes), capped by
+#                               the agentic-fs-ci-boundary permissions boundary.
+#                               Assumable ONLY from the gated `sandbox` GitHub
+#                               Environment. The boundary — not action
+#                               enumeration — is what keeps this safe (region
+#                               lock, state-bucket protection, no self-IAM
+#                               escalation, created roles must inherit it).
 #
 # Both roles get read/write + lock access to the state bucket only.
 #
@@ -30,8 +34,21 @@ data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
-  repo_sub = "repo:${var.github_org}/${var.github_repo}"
+  repo_sub   = "repo:${var.github_org}/${var.github_repo}"
+  account_id = data.aws_caller_identity.current.account_id
+
+  # Constructed (not resource-attribute) ARNs so the boundary policy document can
+  # reference the boundary's own ARN without creating a dependency cycle.
+  boundary_arn     = "arn:aws:iam::${local.account_id}:policy/agentic-fs-ci-boundary"
+  state_bucket_arn = "arn:aws:s3:::${var.state_bucket_name}"
+  ci_identity_arns = [
+    "arn:aws:iam::${local.account_id}:role/agentic-fs-terraform-plan",
+    "arn:aws:iam::${local.account_id}:role/agentic-fs-terraform-apply",
+    local.boundary_arn,
+  ]
 }
 
 # --- Trust: plan role — any job in this repo (PRs incl. forks, scheduled drift) ---
@@ -125,18 +142,36 @@ resource "aws_iam_role_policy" "plan_state" {
 }
 
 # ===========================================================================
-# Apply role (read + scoped write, environment-gated)
+# Apply role (read + broad-but-bounded write, environment-gated)
+#
+# Permission model (chosen over per-action enumeration to avoid touching this
+# root every milestone):
+#   identity = ReadOnlyAccess  (all reads, incl. IAM reads)
+#            + PowerUserAccess  (all non-IAM writes)
+#            + agentic-fs-iam-writes  (IAM writes, scoped to agentic-fs-* only)
+#   boundary = agentic-fs-ci-boundary  (the hard cap — see below)
+#
+# Effective authority = identity ∩ boundary. The boundary is what makes the
+# broad identity safe: it denies anything outside the project's blast radius,
+# denies the role touching its own identity or the state bucket, and forces any
+# role this role CREATES to carry the same boundary (escalation prevention).
 # ===========================================================================
 resource "aws_iam_role" "apply" {
   name                 = "agentic-fs-terraform-apply"
-  description          = "Terraform CI apply role: read + scoped write. Assumable only from the gated `sandbox` GitHub Environment."
+  description          = "Terraform CI apply role: read + bounded write. Assumable only from the gated `sandbox` GitHub Environment."
   assume_role_policy   = data.aws_iam_policy_document.apply_trust.json
   max_session_duration = 3600
+  permissions_boundary = aws_iam_policy.ci_boundary.arn
 }
 
 resource "aws_iam_role_policy_attachment" "apply_readonly" {
   role       = aws_iam_role.apply.name
   policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "apply_poweruser" {
+  role       = aws_iam_role.apply.name
+  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
 }
 
 resource "aws_iam_role_policy" "apply_state" {
@@ -145,36 +180,211 @@ resource "aws_iam_role_policy" "apply_state" {
   policy = data.aws_iam_policy_document.state_backend.json
 }
 
-# --- Scoped infra WRITES for the apply role (widened one milestone at a time) ---
+# --- IAM writes the apply role needs (PowerUserAccess excludes all of iam:*) ---
+# Scoped to agentic-fs-* identities so Terraform can manage app roles/policies
+# (e.g. the Lambda exec role, the tenant-scoped role) but nothing else. Creating
+# a role additionally requires attaching the project boundary (the boundary's
+# escalation-prevention deny enforces this; the condition here is belt-and-braces).
+data "aws_iam_policy_document" "apply_iam_writes" {
+  statement {
+    sid    = "ManageAgenticFsIdentities"
+    effect = "Allow"
+    actions = [
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:UpdateRole",
+      "iam:UpdateRoleDescription",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:PutRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+      "iam:PutRolePermissionsBoundary",
+      "iam:CreatePolicy",
+      "iam:DeletePolicy",
+      "iam:CreatePolicyVersion",
+      "iam:DeletePolicyVersion",
+      "iam:TagPolicy",
+      "iam:UntagPolicy",
+      "iam:CreateInstanceProfile",
+      "iam:DeleteInstanceProfile",
+      "iam:AddRoleToInstanceProfile",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:TagInstanceProfile",
+      "iam:UntagInstanceProfile",
+    ]
+    resources = [
+      "arn:aws:iam::${local.account_id}:role/agentic-fs-*",
+      "arn:aws:iam::${local.account_id}:policy/agentic-fs-*",
+      "arn:aws:iam::${local.account_id}:instance-profile/agentic-fs-*",
+    ]
+  }
+
+  # PassRole — Terraform must hand app roles to the services that run them
+  # (Lambda, ECS, etc.). Scoped to agentic-fs-* roles only.
+  statement {
+    sid       = "PassAgenticFsRoles"
+    effect    = "Allow"
+    actions   = ["iam:PassRole"]
+    resources = ["arn:aws:iam::${local.account_id}:role/agentic-fs-*"]
+  }
+
+  # Service-linked roles (ALB/ECS/etc.) have AWS-controlled names; allow create
+  # only, on the service-linked path.
+  statement {
+    sid       = "ServiceLinkedRoles"
+    effect    = "Allow"
+    actions   = ["iam:CreateServiceLinkedRole"]
+    resources = ["arn:aws:iam::${local.account_id}:role/aws-service-role/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "apply_iam_writes" {
+  name   = "agentic-fs-iam-writes"
+  role   = aws_iam_role.apply.id
+  policy = data.aws_iam_policy_document.apply_iam_writes.json
+}
+
+# ===========================================================================
+# Permissions boundary — the hard cap on the apply role
 #
-# The skeleton manages no application resources yet — `examples/quickstart` is an
-# empty root — so the apply role needs only ReadOnlyAccess + state access above.
-#
-# As each module lands (M0: storage/kms; M1: catalog_dynamodb/compute_lambda;
-# …), add ONLY that module's mutating actions here, scoped by ARN/prefix, and
-# re-apply this root. Never widen to `s3:*` / `*`. Example shape for the storage
-# module (commented until the module exists):
-#
-# data "aws_iam_policy_document" "apply_writes" {
-#   statement {
-#     sid    = "ManageDataBucket"
-#     effect = "Allow"
-#     actions = [
-#       "s3:CreateBucket",
-#       "s3:PutBucketTagging",
-#       "s3:PutBucketPolicy",
-#       "s3:PutBucketVersioning",
-#       "s3:PutEncryptionConfiguration",
-#       "s3:PutLifecycleConfiguration",
-#       "s3:PutBucketNotification",
-#       "s3:PutBucketPublicAccessBlock",
-#     ]
-#     resources = ["arn:aws:s3:::agentic-fs-data-*"]
-#   }
-# }
-#
-# resource "aws_iam_role_policy" "apply_writes" {
-#   name   = "terraform-managed-writes"
-#   role   = aws_iam_role.apply.id
-#   policy = data.aws_iam_policy_document.apply_writes.json
-# }
+# Pattern: allow everything, then DENY the dangerous edges. Effective authority
+# of the apply role can never exceed this, regardless of how broad its identity
+# policies are.
+# ===========================================================================
+data "aws_iam_policy_document" "ci_boundary" {
+  # Ceiling: the boundary permits all; the denies below carve it back.
+  statement {
+    sid       = "AllowAllAsCeiling"
+    effect    = "Allow"
+    actions   = ["*"]
+    resources = ["*"]
+  }
+
+  # (a) Region lock — deny regional actions outside the home region. Global
+  # services (IAM, STS, CloudFront, Route 53, Organizations, …) have no region
+  # and are excluded via not_actions so they keep working.
+  statement {
+    sid    = "DenyOutsideHomeRegion"
+    effect = "Deny"
+    not_actions = [
+      "iam:*",
+      "sts:*",
+      "organizations:*",
+      "account:*",
+      "cloudfront:*",
+      "route53:*",
+      "route53domains:*",
+      "support:*",
+      "waf:*",
+      "globalaccelerator:*",
+      "budgets:*",
+      "ce:*",
+      "cur:*",
+      "health:*",
+      "shield:*",
+      "trustedadvisor:*",
+    ]
+    resources = ["*"]
+    condition {
+      test     = "StringNotEquals"
+      variable = "aws:RequestedRegion"
+      values   = [var.aws_region]
+    }
+  }
+
+  # (b) Protect the state bucket — object read/write stays allowed (that's how
+  # the backend works); deleting or reconfiguring the BUCKET is denied.
+  statement {
+    sid    = "DenyStateBucketReconfig"
+    effect = "Deny"
+    actions = [
+      "s3:DeleteBucket",
+      "s3:PutBucketPolicy",
+      "s3:DeleteBucketPolicy",
+      "s3:PutEncryptionConfiguration",
+      "s3:PutBucketVersioning",
+      "s3:PutBucketPublicAccessBlock",
+      "s3:PutLifecycleConfiguration",
+      "s3:PutBucketOwnershipControls",
+    ]
+    resources = [local.state_bucket_arn]
+  }
+
+  # (c) Self-protection — the apply role cannot modify the CI roles or this
+  # boundary policy (so it can't detach its own cap or widen its own trust).
+  statement {
+    sid       = "DenyCiIdentitySelfEdit"
+    effect    = "Deny"
+    actions   = ["iam:*"]
+    resources = local.ci_identity_arns
+  }
+
+  # (d) Escalation prevention — any role the apply role creates MUST carry this
+  # same boundary, and the boundary can't be stripped or swapped for a weaker
+  # one. Two statements cover "wrong boundary" and "no boundary at all".
+  statement {
+    sid    = "DenyCreateRoleWithWrongBoundary"
+    effect = "Deny"
+    actions = [
+      "iam:CreateRole",
+      "iam:PutRolePermissionsBoundary",
+    ]
+    resources = ["*"]
+    condition {
+      test     = "StringNotEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [local.boundary_arn]
+    }
+  }
+
+  statement {
+    sid    = "DenyCreateRoleWithoutBoundary"
+    effect = "Deny"
+    actions = [
+      "iam:CreateRole",
+    ]
+    resources = ["*"]
+    condition {
+      test     = "Null"
+      variable = "iam:PermissionsBoundary"
+      values   = ["true"]
+    }
+  }
+
+  statement {
+    sid    = "DenyBoundaryRemovalAndHumanCreds"
+    effect = "Deny"
+    actions = [
+      "iam:DeleteRolePermissionsBoundary",
+      "iam:CreateUser",
+      "iam:CreateAccessKey",
+      "iam:CreateLoginProfile",
+      "iam:UpdateLoginProfile",
+    ]
+    resources = ["*"]
+  }
+
+  # (e) Account/org/billing — never CI's job (PowerUserAccess already excludes
+  # most of these; this is defense in depth).
+  statement {
+    sid    = "DenyAccountAndOrg"
+    effect = "Deny"
+    actions = [
+      "organizations:*",
+      "account:*",
+      "aws-portal:*",
+      "billing:*",
+      "payments:*",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "ci_boundary" {
+  name        = "agentic-fs-ci-boundary"
+  description = "Permissions boundary capping the agentic-fs Terraform apply role to the project's blast radius."
+  policy      = data.aws_iam_policy_document.ci_boundary.json
+}

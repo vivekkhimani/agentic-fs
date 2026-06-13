@@ -24,10 +24,31 @@ the gated `sandbox` GitHub Environment.
 
 **Why.** PRs (including from forks) must be able to run a plan without ever being
 able to mutate infrastructure — read-only-by-construction is a stronger
-guarantee than "we promise the apply step is gated". The write surface stays
-tight (widened one milestone at a time, never `*`) while reads stay broad so a
-plan never fails on a missing read permission. No long-lived AWS keys: OIDC
-federation only.
+guarantee than "we promise the apply step is gated". No long-lived AWS keys:
+OIDC federation only.
+
+## 2a. Apply-role writes: permissions boundary, not action enumeration
+
+**Decision.** The apply role gets broad writes (`ReadOnlyAccess` +
+`PowerUserAccess` + IAM writes scoped to `agentic-fs-*`) capped by a permissions
+boundary (`agentic-fs-ci-boundary`). It is **not** a hand-enumerated allow-list
+of per-resource actions.
+
+**Why.** Per-action enumeration is a treadmill — every new resource type means
+editing this root, and `plan` (read-only) can't warn you about a missing write;
+only `apply` fails. A permissions boundary inverts the model: grant breadth,
+then hard-cap the blast radius. Effective authority is `identity ∩ boundary`, so
+the boundary's denies (region lock, state-bucket protection, no self-IAM
+escalation, created-roles-must-inherit-the-boundary, no org/billing) hold no
+matter how broad the identity policy is. This is safe specifically because the
+role is OIDC-only, short-lived, and assumable solely from the gated `sandbox`
+environment — and because this role only protects the *maintainer's* sandbox;
+OSS adopters apply with their own credentials. Net effect: touch ci-roles ~once
+per new AWS *service*, not once per resource. Considered and rejected:
+`AdministratorAccess` (no blast-radius cap) and per-action enumeration (the
+treadmill). A consequence: any role a module creates must inherit the boundary
+(`permissions_boundary = <permissions_boundary_arn>`), or its creation is denied
+— enforced, not just advised.
 
 ## 3. Single `sandbox` environment — not staging/production
 
