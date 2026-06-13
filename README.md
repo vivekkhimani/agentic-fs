@@ -72,6 +72,23 @@ one-page guide — run it on the infrastructure you already have:
 How it works: a backend name in settings + entry-point discovery
 ([ADR 0002](docs/decisions/0002-pluggable-backends-via-entry-points.md)).
 
+## Install (PyPI)
+
+Install only the parts you need — the contracts are usable without the server.
+
+| `pip install …` | You get | For |
+|---|---|---|
+| `afs-core` | contracts (Protocols), DTOs, key scheme, errors — **pydantic only** | building a custom store/connector against the contracts |
+| `afs-core[testing]` | the above **+ conformance kits + in-memory fakes** (adds pytest) | certifying your implementation against the kits |
+| `afs-server` | the service: stores (S3/DynamoDB), `FsService`, FastAPI app, MCP mount | running agentic-fs |
+
+Distributions `afs-core` / `afs-server` import as `afs_core` / `afs_server`. Both
+are PEP 561 typed. Packaging conventions, the namespace decision, and the
+release/versioning flow are in
+[ADR 0005](docs/decisions/0005-packaging-and-pypi-distribution.md);
+releases publish to PyPI on a `vX.Y.Z` tag via Trusted Publishing
+([`release.yml`](.github/workflows/release.yml)).
+
 ## Deploy to your AWS account
 
 `terraform/` provisions the whole footprint (state backend, CI roles, the data

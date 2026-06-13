@@ -26,8 +26,19 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.optional-dependencies]
+testing = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2.7" }]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pytest", marker = "extra == 'testing'", specifier = ">=8" },
+    { name = "pytest-asyncio", marker = "extra == 'testing'", specifier = ">=0.24" },
+]
+provides-extras = ["testing"]
 
 [[package]]
 name = "afs-server"
@@ -51,6 +62,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
+provides-extras = ["postgres", "search"]
 
 [[package]]
 name = "aiofile"

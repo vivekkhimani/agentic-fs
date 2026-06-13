@@ -1,0 +1,113 @@
+name: Release
+
+# Publishes both distributable packages (afs-core, afs-server) to a package
+# index. Two paths:
+#
+#   - push a tag matching v*.*.*  -> publish to PyPI (production)
+#   - manual workflow_dispatch    -> publish to TestPyPI (dry-run rehearsal)
+#
+# Auth is PyPI Trusted Publishing (OIDC) — no API tokens or secrets. `uv
+# publish` reads the GitHub OIDC token (id-token: write) automatically; the
+# index must have a Trusted Publisher configured for this repo + this workflow
+# file + the `pypi` / `testpypi` environment (see the PR description / ADR 0005).
+#
+# Versioning: each package's pyproject `version` is the single source of truth.
+# We tag in lockstep `vX.Y.Z` and that tag MUST equal the version in both
+# pyprojects (verified below before any publish).
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Index to publish to (workflow_dispatch only publishes to TestPyPI).'
+        required: true
+        default: 'testpypi'
+        type: choice
+        options:
+          - testpypi
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Verify the tag matches the package versions
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          for pkg in afs-core afs-server; do
+            ver="$(uv version --project "packages/${pkg}" --short)"
+            if [ "$ver" != "$tag" ]; then
+              echo "::error::Tag v${tag} != ${pkg} version ${ver}. Bump pyproject versions to match the tag."
+              exit 1
+            fi
+            echo "${pkg}: ${ver} == tag ${tag}"
+          done
+
+      - name: Build wheels + sdists for both packages
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          uv build --package afs-core --out-dir dist
+          uv build --package afs-server --out-dir dist
+          ls -l dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    # Dry-run path: manual dispatch only.
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write # OIDC token for Trusted Publishing
+      contents: read
+    steps:
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to TestPyPI (Trusted Publishing)
+        run: uv publish --publish-url https://test.pypi.org/legacy/ --trusted-publishing always dist/*
+
+  publish-pypi:
+    # Production path: only on a v*.*.* tag push.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # OIDC token for Trusted Publishing
+      contents: read
+    steps:
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to PyPI (Trusted Publishing)
+        run: uv publish --trusted-publishing always dist/*
