@@ -132,3 +132,26 @@ When `compute_lambda` lands it is the **first IAM-role-creating module**, so it
 takes a `permissions_boundary_arn` and sets it on the Lambda exec role, threaded
 from the `ci-roles` output (the boundary's escalation-prevention deny enforces it
 — `terraform/DECISIONS.md` §2a).
+
+## Deferred / to investigate
+
+Tracked here so they aren't lost — intentionally *not* built yet.
+
+- **MCP edge Worker (Cloudflare)** — optional edge layer that terminates MCP +
+  OAuth and calls the REST data plane (plan §7.1; `docs/swap-guides/compute.md`).
+  **Deferred on purpose:** its client + tools table are *generated* from
+  `schemas/openapi.json` + the `x-mcp-tool` route extensions, and the primary MCP
+  surface is the in-process Python mount — none of which exist yet. Building it
+  earlier means hand-stubbed, throwaway code plus a premature Node/wrangler
+  toolchain. Sequence: Python MCP mount → OpenAPI export + `x-mcp-tool` → *then*
+  scaffold `workers/mcp-edge/` (generate, don't hand-write) and deploy via
+  Wrangler.
+
+- **Codegen for the MCP/SDK surface — evaluate [Speakeasy](https://www.speakeasy.com/).**
+  The plan hand-rolls the generation pipeline (`openapi-typescript` for the client
+  + a custom emitter for the tools table from `x-mcp-tool` / `x-required-scopes`,
+  plan §7.1, §12). Speakeasy generates **SDKs and an MCP server directly from an
+  OpenAPI spec**, which overlaps heavily with what we'd otherwise build by hand.
+  **Evaluate once the OpenAPI export lands** — if it covers the MCP-tool +
+  scopes mapping, it could replace the custom `gen:client` / `gen:tools` step (and
+  may subsume the edge-Worker codegen too). Decide via an ADR at that point.
