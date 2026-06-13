@@ -109,6 +109,14 @@ resource "aws_lambda_function" "api" {
     aws_iam_role_policy.exec,
     aws_cloudwatch_log_group.api,
   ]
+
+  # Continuous deployment owns the running image: image.yml pushes a new tag and
+  # rolls the function via `aws lambda update-function-code`. Terraform sets the
+  # INITIAL image at creation and then ignores image drift so the two don't
+  # revert each other (see .github/workflows/image.yml, docs/decisions/0004).
+  lifecycle {
+    ignore_changes = [image_uri]
+  }
 }
 
 # --- streaming Function URL ---

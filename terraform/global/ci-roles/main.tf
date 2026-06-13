@@ -388,3 +388,58 @@ resource "aws_iam_policy" "ci_boundary" {
   description = "Permissions boundary capping the agentic-fs Terraform apply role to the project's blast radius."
   policy      = data.aws_iam_policy_document.ci_boundary.json
 }
+
+# ===========================================================================
+# Image-push role (CD) — least-privilege, environment-gated
+#
+# Used by image.yml to build + push the API image to ECR and roll the Lambda to
+# it (aws lambda update-function-code). Scoped to exactly the agentic-fs-api
+# repo + function — far narrower than the apply role. Same gated `sandbox` trust.
+# ===========================================================================
+locals {
+  ecr_api_repo_arn = "arn:aws:ecr:${var.aws_region}:${local.account_id}:repository/agentic-fs-api"
+  api_function_arn = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:agentic-fs-api"
+}
+
+data "aws_iam_policy_document" "image_push" {
+  statement {
+    sid       = "EcrAuth"
+    effect    = "Allow"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"] # this action does not support resource scoping
+  }
+
+  statement {
+    sid    = "EcrPushPull"
+    effect = "Allow"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage",
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload",
+      "ecr:PutImage",
+    ]
+    resources = [local.ecr_api_repo_arn]
+  }
+
+  statement {
+    sid       = "RollLambda"
+    effect    = "Allow"
+    actions   = ["lambda:GetFunction", "lambda:UpdateFunctionCode"]
+    resources = [local.api_function_arn]
+  }
+}
+
+resource "aws_iam_role" "image_push" {
+  name               = "agentic-fs-ci-image-push"
+  description        = "CD role: build/push the API image to ECR + roll the Lambda. Assumable only from the gated sandbox environment."
+  assume_role_policy = data.aws_iam_policy_document.apply_trust.json # same env:sandbox subject
+}
+
+resource "aws_iam_role_policy" "image_push" {
+  name   = "agentic-fs-image-push"
+  role   = aws_iam_role.image_push.id
+  policy = data.aws_iam_policy_document.image_push.json
+}
