@@ -1,15 +1,47 @@
-# `storage` — Data bucket
+# `storage` — data bucket
 
-**Status: scaffold (not yet implemented).** Default footprint.
+The single canonical S3 store (plan §3). Channel-first keys: `tenants/` (raw
+canonical documents), `derived/` (extracted text + manifests + tree artifacts),
+`scratch/` (agent scratch, TTL'd). S3 is the source of truth; everything else is
+healable from it.
 
-The single S3 data bucket (tenants/ + derived/ + scratch/ channels), bucket policy (TLS-only, KMS-required PUT, optional quarantine deny), lifecycle rules, and EventBridge notifications.
+## Resources
 
-The full input/output contract for this module lives in the index table in
-[`../README.md`](../README.md). It will be implemented per the milestone plan
-(`docs/agentic-fs-oss-plan.md` §11, §15); when it lands, add its mutating IAM
-actions to the apply role's `apply_writes` scope in
-[`../../global/ci-roles`](../../global/ci-roles) in the same change.
+- `aws_s3_bucket.data` — `<name_prefix>-data-<account_id>`.
+- Ownership `BucketOwnerEnforced` (ACLs disabled) + full public-access block.
+- Versioning enabled (raw is canonical).
+- SSE-KMS with the project CMK, bucket keys enabled.
+- EventBridge notifications enabled (one rule will feed the extract pipeline).
+- Lifecycle: `abort-multipart` (3d), `scratch-ttl` (expire `scratch/` after
+  `scratch_ttl_days` + drop noncurrent fast), `derived-noncurrent` (7d),
+  `tenants-noncurrent` (`tenants_noncurrent_days`), optional
+  `tenants-intelligent-tiering`.
+- Bucket policy: TLS-only deny, deny PUT without `SSE-KMS`, and (when
+  `quarantine_exempt_role_arns` is set) deny reads of GuardDuty-flagged objects
+  to all but the scanner/extractor.
 
-Conventions: HashiCorp style-guide layout (`terraform.tf`/`main.tf`/`variables.tf`/`outputs.tf`),
-typed + documented variables, `<name_prefix>-<component>` naming, no
-backend/provider block (composed from the example roots).
+## Inputs
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `name_prefix` | string | — | Bucket name prefix. |
+| `account_id` | string | — | Global-uniqueness suffix. |
+| `kms_key_arn` | string | — | Project CMK for SSE-KMS. |
+| `scratch_ttl_days` | number | `7` | TTL for `scratch/`. |
+| `tenants_noncurrent_days` | number | `30` | Noncurrent retention for `tenants/`. |
+| `enable_intelligent_tiering` | bool | `true` | Tier `tenants/` to Intelligent-Tiering. |
+| `quarantine_exempt_role_arns` | list(string) | `[]` | Roles exempt from the malware-quarantine deny. |
+
+## Outputs
+
+| Name | Description |
+|---|---|
+| `bucket_name` | Data bucket name. |
+| `bucket_arn` | Data bucket ARN. |
+| `bucket_regional_domain_name` | Regional domain name. |
+
+## Deferred
+
+`enable_access_logs` (optional S3 server-access-logging bucket, plan §3.3) — not
+yet implemented; CloudTrail S3 data events (`observability` module) are the
+preferred audit story. Added here as a gated logs bucket when needed.

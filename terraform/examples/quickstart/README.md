@@ -13,12 +13,16 @@ terraform plan -var aws_region=us-east-1
 terraform apply -var aws_region=us-east-1
 ```
 
-> **Skeleton today.** This root wires the backend, provider, tagging, and a
-> caller-identity guard but composes no modules yet, so `plan` reports
-> *no changes*. That is deliberate — it lets the whole guardrail pipeline (fmt →
-> validate → tflint → plan → gated apply → drift) be proven green before any
-> real resource lands. Modules are composed here milestone-by-milestone
-> (`docs/agentic-fs-oss-plan.md` §15).
+## Composed so far (M0)
+
+| Module | What it creates |
+|---|---|
+| `kms` | the project CMK (`alias/<name_prefix>-data`) + key policy |
+| `storage` | the canonical data bucket (`<name_prefix>-data-<account_id>`): versioned, SSE-KMS, TLS-only, lifecycle'd, EventBridge-enabled |
+
+Outputs: `data_bucket_name`, `data_bucket_arn`, `kms_key_arn`. Later modules
+(catalog, ingestion, compute, auth, observability) are wired in here
+milestone-by-milestone (`docs/agentic-fs-oss-plan.md` §15).
 
 ## Prerequisites
 
