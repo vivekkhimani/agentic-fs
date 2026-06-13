@@ -38,7 +38,7 @@ serving layer can be built against real backends.
 | Package | What's in it | Tests |
 |---|---|---|
 | `afs-core` | the contracts (`ObjectStore`/`CatalogStore` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** | 50 |
-| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, and a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/entries` · `/stat` · `/doc`) with dev auth + RFC 9457 errors | +35 |
+| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}`), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read` over the same `FsService`, in-process) | +41 |
 
 The API is **containerized** ([`Dockerfile`](../Dockerfile), [ADR 0003](decisions/0003-container-image.md)):
 one multi-stage, non-root, ~190 MB image runs uvicorn on **Lambda (Web Adapter) +
@@ -123,7 +123,9 @@ step of the read path, when the app actually serves requests — no premature sh
 ✅ afs-server: settings + store registry + S3 ObjectStore (moto-certified)
 ✅ afs-server: DynamoDB CatalogStore (certified by the same kit)
 ✅ afs-server: FsService read path + FastAPI app + Dockerfile + docker-compose
-⏭️ MCP mount (FsService is shared in-process) + dev-seed → "agent reads docs"   ← next
+✅ afs-server: MCP mount at /mcp (whoami/fs_list/fs_stat/fs_read, shared FsService)
+⏭️ ingestion + extraction → documents actually land and become readable          ← next
+      (until then the read path + MCP tools work but the corpus is empty)
 ⏭️ ecr_mirror (push image) → compute_lambda (deploy, Function URL)
       → pointed at the LIVE bucket + catalog                       ← the AWS hookup
 ```
