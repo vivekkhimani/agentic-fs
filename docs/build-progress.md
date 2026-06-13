@@ -38,12 +38,18 @@ serving layer can be built against real backends.
 | Package | What's in it | Tests |
 |---|---|---|
 | `afs-core` | the contracts (`ObjectStore`/`CatalogStore` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** | 50 |
-| `afs-server` | `settings`, the **pluggable store registry** (builtins + `afs.object_stores` entry points), and `S3ObjectStore` — certified by the afs-core kit via `moto` | +9 |
+| `afs-server` | `settings`, the **pluggable store registry** (builtins + entry-point plugins), `S3ObjectStore` **and `DynamoDBCatalogStore`** — both certified by the afs-core kits via `moto` | +22 |
 
-Swap-ability is real and demonstrated: the S3 store *is* the store for any
-S3-compatible endpoint (MinIO, Cloudflare R2, Wasabi, B2) via one env var —
-[swap guide](swap-guides/object-store.md),
-[ADR 0002](decisions/0002-pluggable-backends-via-entry-points.md).
+**Both stores done.** Swap-ability is real and demonstrated:
+- object store — the S3 store *is* the store for any S3-compatible endpoint
+  (MinIO, Cloudflare R2, Wasabi, B2) via one env var
+  ([swap guide](swap-guides/object-store.md)).
+- catalog store — `DynamoDBCatalogStore` over the single-table schema; another
+  backend (e.g. Postgres) is implement → certify → register
+  ([swap guide](swap-guides/catalog.md)).
+
+Both proven by the *same* conformance kit that certifies the in-memory fakes
+([ADR 0002](decisions/0002-pluggable-backends-via-entry-points.md)).
 
 ## How the infrastructure maps to the architecture
 
@@ -110,8 +116,9 @@ step of the read path, when the app actually serves requests — no premature sh
 ✅ afs-core foundations (keys/errors/models)
 ✅ afs-core contracts + conformance kits
 ✅ afs-server: settings + store registry + S3 ObjectStore (moto-certified)
-⏭️ afs-server: DynamoDB CatalogStore (certified by the same kit)   ← next
-⏭️ thin FastAPI/FastMCP read app (list/read) → prove locally on docker-compose
+✅ afs-server: DynamoDB CatalogStore (certified by the same kit)
+⏭️ afs-server: read-path service + thin FastAPI/FastMCP app (list/read)   ← next
+      → prove locally on docker-compose (MinIO + DynamoDB Local)
 ⏭️ Dockerfile → image → ecr_mirror (push) → compute_lambda (deploy, Function URL)
       → pointed at the LIVE bucket + catalog                       ← the AWS hookup
 ```

@@ -15,9 +15,12 @@ Store layer (in progress):
 - `afs_server.stores.objects_s3.S3ObjectStore` — the S3 `ObjectStore`. Because it
   speaks plain S3, it *is* your store for any S3-compatible endpoint (MinIO,
   Cloudflare R2, Wasabi, Backblaze B2) via `AFS_S3_ENDPOINT_URL` — no code change.
+- `afs_server.stores.catalog_dynamodb.DynamoDBCatalogStore` — the DynamoDB
+  `CatalogStore` over the single-table schema (`AFS_DYNAMODB_ENDPOINT_URL` points
+  at DynamoDB Local for dev).
 
-Coming next: `catalog_dynamodb` (DynamoDB `CatalogStore`), then the read-path
-services + REST/MCP app.
+Both stores are certified by the afs-core conformance kits via `moto`. Coming
+next: the read-path services + the thin REST/MCP app.
 
 ## Swapping a backend (plug-and-play)
 
