@@ -124,11 +124,12 @@ step of the read path, when the app actually serves requests — no premature sh
 ✅ afs-server: DynamoDB CatalogStore (certified by the same kit)
 ✅ afs-server: FsService read path + FastAPI app + Dockerfile + docker-compose
 ✅ afs-server: MCP mount at /mcp (whoami/fs_list/fs_stat/fs_read, shared FsService)
-✅ ecr_mirror + compute_lambda modules — wired into quickstart; ECR repo LIVE
-🔧 deploy: image build done; ECR push pending (env upload limit) → then
-      `enable_compute=true` apply creates the Lambda + Function URL (AWS_IAM)
+✅ ecr_mirror + compute_lambda + image CD (image.yml: build/push/roll on merge)
+✅ DEPLOYED — API LIVE on Lambda + Function URL (AWS_IAM); healthz/readyz/me/entries
+      verified via SigV4. readyz=ok ⇒ the Lambda reached DynamoDB through its
+      least-priv, boundary-bound exec role. The whole AWS path works end-to-end.
 ⏭️ ingestion + extraction → documents actually land and become readable          ← next
-      (until then the read path + MCP tools work but the corpus is empty)
+      (the live API answers, but the corpus is empty until ingestion)
 ```
 
 When `compute_lambda` lands it is the **first IAM-role-creating module**, so it
