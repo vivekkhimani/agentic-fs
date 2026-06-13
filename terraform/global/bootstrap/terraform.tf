@@ -20,11 +20,11 @@ terraform {
   #
   # See ./README.md for the exact command sequence.
   #
-  # backend "s3" {
-  #   bucket       = "agentic-fs-terraform-state-002988089284"
-  #   key          = "global/bootstrap.tfstate"
-  #   region       = "us-east-1"
-  #   encrypt      = true
-  #   use_lockfile = true
-  # }
+  backend "s3" {
+    bucket       = "agentic-fs-terraform-state-002988089284"
+    key          = "global/bootstrap.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
