@@ -1,0 +1,86 @@
+repos:
+  # General hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+
+  # Terraform — fmt, validate, tflint, behind a smart gate.
+  #
+  # These hooks are expensive (each `terraform validate` runs an init and walks
+  # the module tree) and require the terraform / tflint CLIs locally. We want
+  # them to:
+  #
+  #   - Skip entirely when no path under `terraform/` has any working-tree
+  #     change (staged, unstaged, or untracked). `pre-commit run --all-files`
+  #     becomes a fast no-op for non-infra commits.
+  #   - Run against the whole `terraform/` tree (not just changed files) when
+  #     there IS a change there — validate / tflint operate per-module, so
+  #     partial runs are fragile.
+  #
+  # Implementation: a single local "gate" hook runs always, checks git for
+  # changes under `terraform/`, and only then re-invokes pre-commit with the
+  # manual-stage terraform hooks. The terraform hooks themselves are
+  # `stages: [manual]` so they never fire from the default lifecycle — they're
+  # only reachable through the gate.
+  #
+  # To force-run them regardless of working-tree state:
+  #
+  #     pre-commit run --hook-stage manual --all-files \
+  #         terraform_fmt terraform_validate terraform_tflint
+  - repo: local
+    hooks:
+      - id: terraform_gate
+        name: terraform (fmt, validate, tflint)
+        language: system
+        pass_filenames: false
+        always_run: true
+        entry: bash -c '
+            changed="$(git diff --name-only HEAD -- terraform/ 2>/dev/null)$(git ls-files --others --exclude-standard -- terraform/ 2>/dev/null)";
+            if [ -z "$changed" ]; then
+                echo "No working-tree changes under terraform/; skipping terraform hooks.";
+                exit 0;
+            fi;
+            ec=0;
+            pre-commit run --hook-stage manual --all-files terraform_fmt      || ec=$?;
+            pre-commit run --hook-stage manual --all-files terraform_validate || ec=$?;
+            pre-commit run --hook-stage manual --all-files terraform_tflint   || ec=$?;
+            exit $ec;'
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.106.0
+    hooks:
+      - id: terraform_fmt
+        stages: [manual]
+        files: ^terraform/.*\.tf$
+      - id: terraform_validate
+        stages: [manual]
+        files: ^terraform/.*\.(tf|tfvars|hcl)$
+        args:
+          - --hook-config=--retry-once-with-cleanup=true
+      - id: terraform_tflint
+        stages: [manual]
+        files: ^terraform/.*\.(tf|tfvars|hcl)$
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/terraform/.tflint.hcl
+
+  # Python — Ruff (lint + format). Inert until the uv workspace lands under
+  # packages/ (M0); the `files` filter scopes it there.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.2
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^packages/
+      - id: ruff-format
+        files: ^packages/
+
+  # NOTE: the `ty` type-check hook (uv run ty check) and the `worker-tsc` hook
+  # (tsc --noEmit + eslint for workers/mcp-edge) are added alongside the
+  # packages/ workspace and workers/mcp-edge tree respectively — see plan §13.1.
+  # They are omitted now so the hook chain can't reference directories that do
+  # not yet exist.

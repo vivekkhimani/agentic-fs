@@ -1,0 +1,32 @@
+# Local Terraform working dirs and plugin caches
+**/.terraform/*
+.terraform.tfstate.lock.info
+
+# State files must NEVER be committed (remote S3 backend is the source of
+# truth). The only state that touches disk is bootstrap's first local apply,
+# before it migrates into S3 — never commit it.
+*.tfstate
+*.tfstate.*
+
+# Saved plan artifacts (produced in CI, applied as the reviewed plan)
+*.tfplan
+*.tfplan.json
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Variable files that may carry secrets. Our committed *.tfvars hold only
+# non-secret config; anything ending in .auto.tfvars or *.secret.tfvars is
+# local-only.
+*.auto.tfvars
+*.secret.tfvars
+
+# Keep the dependency lock file committed for ROOT modules (.terraform.lock.hcl
+# is intentionally NOT ignored there — it pins provider versions/hashes for
+# reproducible CI).
+#
+# But CHILD modules don't get their own lock file — only roots do. pre-commit's
+# terraform_validate hook runs `terraform init` inside each module dir and drops
+# a stray lock there; ignore those so they never get committed.
+modules/**/.terraform.lock.hcl

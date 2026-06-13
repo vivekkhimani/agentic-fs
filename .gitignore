@@ -1,0 +1,38 @@
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- Python (packages land in M0+) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.uv/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.ty_cache/
+dist/
+build/
+
+# --- Node (workers/mcp-edge lands later) ---
+node_modules/
+npm-debug.log*
+
+# --- Secrets / local env ---
+.env
+.env.*
+!.env.example
+*.secret.*
+
+# --- Terraform ---
+# Detailed Terraform ignores live in terraform/.gitignore; these catch any
+# stray state/plan artifacts produced outside that tree.
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
