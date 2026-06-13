@@ -37,8 +37,8 @@ variable "image_tag" {
     After creation, image.yml rolls the running image via update-function-code
     and Terraform ignores image drift, so this only matters on a fresh create.
   EOT
-  type    = string
-  default = "951da7ab319f"
+  type        = string
+  default     = "951da7ab319f"
 }
 
 variable "function_url_auth_type" {
