@@ -1,15 +1,34 @@
-# `kms` — KMS CMK
+# `kms` — project CMK
 
-**Status: scaffold (not yet implemented).** Default footprint.
+The shared customer-managed key used for SSE-KMS across agentic-fs's stateful
+layers (data bucket today; catalog table and derived stores as they land).
 
-Customer-managed key, alias, and key policy — including the per-tenant key template gated by `per_tenant_kms`.
+## Resources
 
-The full input/output contract for this module lives in the index table in
-[`../README.md`](../README.md). It will be implemented per the milestone plan
-(`docs/agentic-fs-oss-plan.md` §11, §15); when it lands, add its mutating IAM
-actions to the apply role's `apply_writes` scope in
-[`../../global/ci-roles`](../../global/ci-roles) in the same change.
+- `aws_kms_key.this` — CMK with rotation enabled, configurable deletion window.
+- `aws_kms_alias.this` — `alias/<name_prefix>-data`.
+- Key policy granting the **account root** full control; every other grant is
+  delegated through IAM policies on the consuming principals (the AWS-recommended
+  default — IAM stays the single place authority is granted).
 
-Conventions: HashiCorp style-guide layout (`terraform.tf`/`main.tf`/`variables.tf`/`outputs.tf`),
-typed + documented variables, `<name_prefix>-<component>` naming, no
-backend/provider block (composed from the example roots).
+## Inputs
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `name_prefix` | string | — | Prefix for the alias (`alias/<name_prefix>-data`). |
+| `deletion_window_in_days` | number | `30` | CMK deletion waiting period (7–30). |
+
+## Outputs
+
+| Name | Description |
+|---|---|
+| `key_arn` | CMK ARN — pass to `storage` (and future `catalog_dynamodb`). |
+| `key_id` | CMK key id. |
+| `alias_arn` | Alias ARN. |
+
+## Deferred
+
+`per_tenant_kms` (plan §4.3) — premium per-tenant cryptographic isolation. v1
+ships the key-policy template + the app-side `tenant -> key_id` seam; the
+automated key-fleet lifecycle is control-plane-shaped and is added here as a
+`per_tenant_kms` flag + `for_each` fleet when that work lands.
