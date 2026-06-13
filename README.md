@@ -6,10 +6,12 @@ documents in **your S3**, exposed through **MCP** (and REST). Multi-tenant,
 deploys with **one `terraform apply`**, ~**$2/month idle**, and **every stateful
 layer is swappable**.
 
-> **Status: early, building in the open.** The infra substrate, the contracts,
-> the stores, and a read-path API are in place; ingestion, search, and the cloud
-> deploy are next. Live status: [`docs/build-progress.md`](docs/build-progress.md).
-> License: Apache-2.0. Background & rationale: [`docs/agentic-fs-oss-plan.md`](docs/agentic-fs-oss-plan.md).
+> **Status: early, in active development** (private repo for now; public OSS
+> release + PyPI/module publishing are sequenced for the dogfood milestone — see
+> [`docs/build-progress.md`](docs/build-progress.md)). The infra, contracts,
+> stores, a read-path API + MCP mount are in place and the API is **deployed live
+> on AWS Lambda**; ingestion is next. License: Apache-2.0 (intended).
+> Background & rationale: [`docs/agentic-fs-oss-plan.md`](docs/agentic-fs-oss-plan.md).
 
 ## Run it locally (5 minutes)
 

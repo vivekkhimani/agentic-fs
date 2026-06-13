@@ -137,6 +137,35 @@ takes a `permissions_boundary_arn` and sets it on the Lambda exec role, threaded
 from the `ci-roles` output (the boundary's escalation-prevention deny enforces it
 — `terraform/DECISIONS.md` §2a).
 
+## Remaining docket (roadmap)
+
+**Product — toward a demoable v1:**
+
+- **Ingestion & extraction (M2)** *(next)* — the write path (upload intent → S3 →
+  catalog row), event-driven cataloger + extractor (Docling), `catalog_only`
+  degradation, the reconciler, and the connector SDK + `fs-crawler`. *The biggest
+  unlock — makes the corpus non-empty so `fs_list`/`fs_read` return real docs.*
+- **Grep, scratch, budgets (M3)** — two-stage grep, glob, the scratch namespace,
+  and the full MCP middleware (per-call enforcement, budgets, audit log).
+- **OAuth 2.1 resource server** (+ `auth_cognito`) — replaces dev-auth; required
+  for real multi-tenant and to safely set the Function URL to `NONE`/public.
+
+**Platform / enablers:**
+
+- **OpenAPI export + `x-mcp-tool` extensions** + codegen drift-gate → unblocks
+  typed clients, the edge Worker, and the Speakeasy evaluation.
+- `search_bedrock_kb` (optional semantic), `observability` (alarms/dashboard),
+  `catalog_postgres` (proves the catalog swap for real), `compute_fargate` +
+  `network`, and the `hardened`/`full` example roots.
+
+**Release / consumption plumbing** (prerequisites for the dogfood consumer repo):
+
+- **Package release** — `release.yml`: `uv build` the three packages → PyPI, with
+  versioned tags.
+- **Image publishing** — publish `agentic-fs-api` to a public registry (GHCR /
+  public ECR) so consumers can mirror it into their own account.
+- **Externally-consumable Terraform modules** — see the distribution note below.
+
 ## Deferred / to investigate
 
 Tracked here so they aren't lost — intentionally *not* built yet.
@@ -165,3 +194,41 @@ Tracked here so they aren't lost — intentionally *not* built yet.
   **Evaluate once the OpenAPI export lands** — if it covers the MCP-tool +
   scopes mapping, it could replace the custom `gen:client` / `gen:tools` step (and
   may subsume the edge-Worker codegen too). Decide via an ADR at that point.
+
+- **Dogfood via a separate consumer repo (BYO-AWS validation).** The whole pitch
+  is "deploy into *your* account: `pip install` + `terraform apply`." A second
+  repo that consumes our published packages + tagged Terraform modules + mirrored
+  image — deploying agentic-fs into its own account and ingesting/reading docs —
+  is the real proof. **Sequencing:** keep building the product here (fast
+  monorepo iteration); do the release plumbing in parallel; stand up a *thin*
+  deploy-only dogfood as soon as packages/image/modules publish; do the *full*
+  dogfood after ingestion; **then tear down this maintainer sandbox via the
+  `Project=agentic-fs` tag** (which also validates the teardown story). Two
+  consumption surfaces with different friction: the **Python packages** (easy once
+  published) and the **Terraform modules**, which need (1) tagged module refs,
+  (2) decoupling from monorepo specifics (`compute_lambda` currently reads *our*
+  `ci-roles` boundary from remote state, and the boundary is *required* — must
+  become **optional** for external roots, plus a monorepo-free `quickstart`
+  variant), and (3) **image distribution**: Lambda pulls only from same-account
+  ECR, so the consumer flow is *publish image publicly → their `ecr_mirror` copies
+  it into their ECR → their `compute_lambda` points at the copy* (the "mirror"
+  half of `ecr_mirror`, currently deferred, becomes a prerequisite).
+
+- **Distribution & repo visibility (no rush — sequence with the consumer repo).**
+  - Publishing to **PyPI works from a private repo** (OIDC trusted publishing; the
+    source stays private). *But a pypi.org package is public* — anyone can install
+    and read the wheel. Truly-private packages would need a private index (AWS
+    CodeArtifact), not pypi.org.
+  - **We don't need the repo public for PyPI**, but we *do* for frictionless
+    Terraform `git::` module sources (a private repo forces consumers' CI to carry
+    a deploy key/PAT). Public = anonymous.
+  - **Pre-public cleanup (decision: do it as the "make it consumable" slice, not
+    now):** parameterize the hardcoded account ID `002988089284` (it's baked into
+    ci-roles/bootstrap defaults, the backend blocks, `quickstart`, the README, and
+    the `AWS_ACCOUNT_ID` secret) into variables/placeholders; decouple the
+    monorepo-specific CI. Account IDs aren't *secret*, but hardcoding the
+    maintainer's sandbox throughout an OSS template is poor hygiene.
+  - **Recommendation:** keep developing privately; do the parameterization +
+    visibility flip as a deliberate slice when wiring the consumer repo. Until
+    then, **avoid adding new account-ID / monorepo coupling.** Promote this to a
+    proper ADR (`docs/decisions/`) when we commit to the public timeline.
