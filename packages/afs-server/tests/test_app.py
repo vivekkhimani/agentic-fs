@@ -12,8 +12,8 @@ from afs_core import keys
 from afs_core.models import ExtractionState
 from afs_core.testing import InMemoryCatalogStore, InMemoryObjectStore, make_entry
 from afs_server.app import create_app
-from afs_server.dependencies import get_catalog, get_fs_service
-from afs_server.services import FsService
+from afs_server.dependencies import get_catalog, get_fs_service, get_ingest_service
+from afs_server.services import FsService, IngestService
 
 
 def _seed(catalog: InMemoryCatalogStore, objects: InMemoryObjectStore) -> None:
@@ -47,6 +47,7 @@ def client() -> Iterator[TestClient]:
     _seed(catalog, objects)
     app = create_app()
     app.dependency_overrides[get_fs_service] = lambda: FsService(catalog, objects)
+    app.dependency_overrides[get_ingest_service] = lambda: IngestService(catalog, objects)
     app.dependency_overrides[get_catalog] = lambda: catalog
     with TestClient(app) as c:
         yield c
@@ -97,3 +98,24 @@ def test_read_catalog_only_returns_422(client: TestClient) -> None:
     r = client.get("/v1/fs/handbook/doc", params={"path": "scan.pdf"})
     assert r.status_code == 422
     assert r.json()["code"] == "catalog_only"
+
+
+def test_ingest_then_read_round_trip(client: TestClient) -> None:
+    put = client.put(
+        "/v1/ingest/handbook/doc",
+        params={"path": "guide.md"},
+        content=b"# Guide\nhello",
+        headers={"content-type": "text/markdown"},
+    )
+    assert put.status_code == 201
+    assert put.json()["extraction"]["status"] == "extracted"
+
+    listed = client.get("/v1/fs/handbook/entries")
+    assert "guide.md" in {e["path"] for e in listed.json()["items"]}
+
+    read = client.get("/v1/fs/handbook/doc", params={"path": "guide.md"})
+    assert read.json()["pages"][0]["text"] == "# Guide\nhello"
+
+    assert client.delete("/v1/ingest/handbook/doc", params={"path": "guide.md"}).status_code == 202
+    gone = client.get("/v1/fs/handbook/stat", params={"path": "guide.md"})
+    assert gone.status_code == 404

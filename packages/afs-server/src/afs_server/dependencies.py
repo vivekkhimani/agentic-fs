@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import Depends, Request
 
 from afs_server.auth import TenantContext, resolve_context
-from afs_server.services import FsService
+from afs_server.services import FsService, IngestService
 from afs_server.settings import Settings, load_settings
 
 if TYPE_CHECKING:
@@ -32,6 +32,10 @@ def get_fs_service(request: Request) -> FsService:
     return FsService(request.app.state.catalog, request.app.state.objects)
 
 
+def get_ingest_service(request: Request) -> IngestService:
+    return IngestService(request.app.state.catalog, request.app.state.objects)
+
+
 def get_principal(settings: Annotated[Settings, Depends(get_settings)]) -> TenantContext:
     return resolve_context(settings)
 
@@ -39,4 +43,5 @@ def get_principal(settings: Annotated[Settings, Depends(get_settings)]) -> Tenan
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 CatalogDep = Annotated["CatalogStore", Depends(get_catalog)]
 FsDep = Annotated[FsService, Depends(get_fs_service)]
+IngestDep = Annotated[IngestService, Depends(get_ingest_service)]
 PrincipalDep = Annotated[TenantContext, Depends(get_principal)]
