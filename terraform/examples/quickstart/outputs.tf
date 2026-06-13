@@ -20,6 +20,16 @@ output "kms_key_arn" {
   value       = module.kms.key_arn
 }
 
+output "catalog_table_name" {
+  description = "Name of the DynamoDB catalog table."
+  value       = module.catalog.table_name
+}
+
+output "catalog_table_arn" {
+  description = "ARN of the DynamoDB catalog table."
+  value       = module.catalog.table_arn
+}
+
 output "region" {
   description = "AWS region this footprint is deployed into."
   value       = var.aws_region

@@ -23,3 +23,11 @@ module "storage" {
   account_id  = data.aws_caller_identity.current.account_id
   kms_key_arn = module.kms.key_arn
 }
+
+# M1 — the read-path index: the default DynamoDB catalog.
+module "catalog" {
+  source = "../../modules/catalog_dynamodb"
+
+  name_prefix = var.name_prefix
+  kms_key_arn = module.kms.key_arn
+}
