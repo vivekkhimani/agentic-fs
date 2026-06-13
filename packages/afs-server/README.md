@@ -27,6 +27,9 @@ Both stores are certified by the afs-core conformance kits via `moto`.
 - `afs_server.app` — the FastAPI app: `/v1/healthz`, `/readyz`, `/me`, and
   `fs/{ns}/{entries,stat,doc}`; dev auth (static principal, never prod); every
   `AfsError` rendered as RFC 9457 `problem+json`.
+- `afs_server.mcp` — the MCP surface mounted at `/mcp` (FastMCP): `whoami`,
+  `fs_list`, `fs_stat`, `fs_read` over the *same* `FsService` (in-process, no HTTP
+  self-calls). The full middleware chain + remaining tools land with their slices.
 
 The image (`../../Dockerfile`) runs this app on Lambda / Fargate / locally;
 `make dev` from the repo root runs it against MinIO + DynamoDB Local. Coming

@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.2",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
+    "fastmcp>=2",
 ]
 
 [build-system]
