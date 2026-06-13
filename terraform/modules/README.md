@@ -54,6 +54,14 @@ modules rather than standing up their own resources:
   `Project = agentic-fs`, `ManagedBy = terraform`, `Repo`, `Component`, `Env` —
   so the entire footprint is discoverable and tearable-down by tag
   (see [`../README.md`](../README.md#teardown)).
+- **IAM roles must inherit the CI boundary:** any module that creates an
+  `aws_iam_role` (e.g. `compute_lambda`, `compute_fargate`, `ingestion`) must
+  expose a `permissions_boundary_arn` variable and set it on every role it
+  creates. The CI apply role's own permissions boundary *denies* creating a role
+  that doesn't carry the same boundary (escalation prevention) — so an unbounded
+  role would fail to apply in CI. Wire the `permissions_boundary_arn` output of
+  [`../global/ci-roles`](../global/ci-roles) through the example roots into these
+  modules. See [`../DECISIONS.md`](../DECISIONS.md) §2a.
 - **Validation:** `terraform fmt` + `validate` + `tflint` in CI; per-module
   `*.tftest.hcl` with `command = plan` and mocked providers assert policy JSON,
   flag-conditional resource counts, and naming; `terraform-docs` keeps each
