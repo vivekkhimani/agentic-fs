@@ -1,3 +1,7 @@
+# `pre-commit install` wires both the normal hooks and the commit-msg hook
+# (Conventional Commits, which feeds `cz bump`).
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
   # General hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -8,6 +12,14 @@ repos:
       - id: check-yaml
       - id: check-json
       - id: check-added-large-files
+
+  # Conventional Commits — validate the message so `cz bump` can compute the
+  # SemVer bump (feat → minor, fix → patch, ! / BREAKING CHANGE → major).
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.16.3
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
 
   # Terraform — fmt, validate, tflint, behind a smart gate.
   #

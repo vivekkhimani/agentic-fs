@@ -20,6 +20,10 @@ dev = [
     # Linux is unaffected. moto only needs cryptography for request signing.
     "cryptography>=43,<45",
 ]
+# Maintainer-only release tooling — not synced by a normal `uv sync`. The
+# commit-msg pre-commit hook brings its own commitizen, so contributors don't
+# need this; only `uv run --group release cz bump` (at release time) does.
+release = ["commitizen>=4"]
 
 # --- Shared lint/format config (packages inherit this by config discovery) ---
 [tool.ruff]
@@ -52,3 +56,19 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["packages"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+
+# --- Versioning: Commitizen computes the SemVer bump from Conventional Commits ---
+# `uv run cz bump` reads commits since the last tag, bumps BOTH packages in
+# lockstep, updates CHANGELOG.md, and tags vX.Y.Z (which release.yml publishes).
+# major_version_zero keeps breaking changes at a MINOR bump while we're on 0.x.
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+version_scheme = "semver"
+major_version_zero = true
+tag_format = "v$version"
+update_changelog_on_bump = true
+version_files = [
+    "packages/afs-core/pyproject.toml:^version =",
+    "packages/afs-server/pyproject.toml:^version =",
+]

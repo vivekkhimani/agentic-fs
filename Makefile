@@ -2,7 +2,7 @@
 # Run `make` (or `make help`) to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help sync test lint fmt up down logs seed dev docker-build clean
+.PHONY: help sync test lint fmt bump up down logs seed dev docker-build clean
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -23,6 +23,10 @@ lint: ## Lint + format check
 fmt: ## Auto-format and autofix
 	uv run ruff format packages
 	uv run ruff check --fix packages
+
+bump: ## Cut a release: compute the SemVer bump from commits, update versions + CHANGELOG, tag
+	uv run --group release cz bump
+	@echo "Now: git push --follow-tags  (the tag triggers release.yml → publish)"
 
 # --- Local stack (MinIO + DynamoDB Local + the API) ---
 
