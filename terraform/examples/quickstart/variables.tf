@@ -28,13 +28,17 @@ variable "env" {
 variable "enable_compute" {
   description = "Deploy the API Lambda + Function URL. Requires the image to be pushed to ECR first (see README)."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "image_tag" {
-  description = "Tag of the API image in ECR that the Lambda runs."
-  type        = string
-  default     = "0.1.0"
+  description = <<-EOT
+    Tag of the API image in ECR used to CREATE the Lambda (bootstrap image).
+    After creation, image.yml rolls the running image via update-function-code
+    and Terraform ignores image drift, so this only matters on a fresh create.
+  EOT
+  type    = string
+  default = "951da7ab319f"
 }
 
 variable "function_url_auth_type" {

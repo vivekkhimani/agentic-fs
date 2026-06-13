@@ -50,7 +50,10 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080 \
     AWS_LWA_PORT=8080 \
-    AWS_LWA_READINESS_CHECK_PATH=/v1/healthz
+    AWS_LWA_READINESS_CHECK_PATH=/v1/healthz \
+    # Stream the raw HTTP response (matches the Function URL's RESPONSE_STREAM
+    # invoke mode); without this the adapter emits a buffered proxy envelope.
+    AWS_LWA_INVOKE_MODE=response_stream
 
 # Dedicated non-root user.
 RUN groupadd --system afs && useradd --system --gid afs --uid 10001 afs
