@@ -22,10 +22,17 @@ class Settings(BaseSettings):
     s3_endpoint_url: str | None = None  # set for MinIO / R2 / Wasabi / B2
     kms_key_arn: str | None = None  # SSE-KMS on PUT when set
 
-    # --- catalog store (implemented in a later slice) ---
+    # --- catalog store ---
     catalog_backend: str = "dynamodb"  # builtin "dynamodb"/"postgres", or a plugin name
     catalog_table: str = "agentic-fs-catalog"
     dynamodb_endpoint_url: str | None = None  # set for DynamoDB Local
+
+    # --- auth ---
+    # "dev" = a static local principal (NEVER for production); "oidc" = the OAuth
+    # resource server (not yet implemented — fails closed until that slice lands).
+    auth_mode: str = "dev"
+    dev_tenant_id: str = "dev"
+    dev_principal_id: str = "dev"
 
 
 def load_settings() -> Settings:

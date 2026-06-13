@@ -38,7 +38,12 @@ serving layer can be built against real backends.
 | Package | What's in it | Tests |
 |---|---|---|
 | `afs-core` | the contracts (`ObjectStore`/`CatalogStore` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** | 50 |
-| `afs-server` | `settings`, the **pluggable store registry** (builtins + entry-point plugins), `S3ObjectStore` **and `DynamoDBCatalogStore`** — both certified by the afs-core kits via `moto` | +22 |
+| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, and a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/entries` · `/stat` · `/doc`) with dev auth + RFC 9457 errors | +35 |
+
+The API is **containerized** ([`Dockerfile`](../Dockerfile), [ADR 0003](decisions/0003-container-image.md)):
+one multi-stage, non-root, ~190 MB image runs uvicorn on **Lambda (Web Adapter) +
+Fargate + locally** — verified to build and serve `/v1/healthz`. `make dev` runs
+it against MinIO + DynamoDB Local.
 
 **Both stores done.** Swap-ability is real and demonstrated:
 - object store — the S3 store *is* the store for any S3-compatible endpoint
@@ -117,9 +122,9 @@ step of the read path, when the app actually serves requests — no premature sh
 ✅ afs-core contracts + conformance kits
 ✅ afs-server: settings + store registry + S3 ObjectStore (moto-certified)
 ✅ afs-server: DynamoDB CatalogStore (certified by the same kit)
-⏭️ afs-server: read-path service + thin FastAPI/FastMCP app (list/read)   ← next
-      → prove locally on docker-compose (MinIO + DynamoDB Local)
-⏭️ Dockerfile → image → ecr_mirror (push) → compute_lambda (deploy, Function URL)
+✅ afs-server: FsService read path + FastAPI app + Dockerfile + docker-compose
+⏭️ MCP mount (FsService is shared in-process) + dev-seed → "agent reads docs"   ← next
+⏭️ ecr_mirror (push image) → compute_lambda (deploy, Function URL)
       → pointed at the LIVE bucket + catalog                       ← the AWS hookup
 ```
 
@@ -127,3 +132,26 @@ When `compute_lambda` lands it is the **first IAM-role-creating module**, so it
 takes a `permissions_boundary_arn` and sets it on the Lambda exec role, threaded
 from the `ci-roles` output (the boundary's escalation-prevention deny enforces it
 — `terraform/DECISIONS.md` §2a).
+
+## Deferred / to investigate
+
+Tracked here so they aren't lost — intentionally *not* built yet.
+
+- **MCP edge Worker (Cloudflare)** — optional edge layer that terminates MCP +
+  OAuth and calls the REST data plane (plan §7.1; `docs/swap-guides/compute.md`).
+  **Deferred on purpose:** its client + tools table are *generated* from
+  `schemas/openapi.json` + the `x-mcp-tool` route extensions, and the primary MCP
+  surface is the in-process Python mount — none of which exist yet. Building it
+  earlier means hand-stubbed, throwaway code plus a premature Node/wrangler
+  toolchain. Sequence: Python MCP mount → OpenAPI export + `x-mcp-tool` → *then*
+  scaffold `workers/mcp-edge/` (generate, don't hand-write) and deploy via
+  Wrangler.
+
+- **Codegen for the MCP/SDK surface — evaluate [Speakeasy](https://www.speakeasy.com/).**
+  The plan hand-rolls the generation pipeline (`openapi-typescript` for the client
+  + a custom emitter for the tools table from `x-mcp-tool` / `x-required-scopes`,
+  plan §7.1, §12). Speakeasy generates **SDKs and an MCP server directly from an
+  OpenAPI spec**, which overlaps heavily with what we'd otherwise build by hand.
+  **Evaluate once the OpenAPI export lands** — if it covers the MCP-tool +
+  scopes mapping, it could replace the custom `gen:client` / `gen:tools` step (and
+  may subsume the edge-Worker codegen too). Decide via an ADR at that point.
