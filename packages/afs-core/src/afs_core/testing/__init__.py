@@ -7,6 +7,7 @@ impls and back afs-core's own tests.
 
 from afs_core.testing.conformance import (
     CatalogStoreConformance,
+    NormalizerConformance,
     ObjectStoreConformance,
     make_entry,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "CatalogStoreConformance",
     "InMemoryCatalogStore",
     "InMemoryObjectStore",
+    "NormalizerConformance",
     "ObjectStoreConformance",
     "make_entry",
 ]

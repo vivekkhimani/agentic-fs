@@ -13,6 +13,12 @@ from afs_core.models.core import (
     Page,
     SourceRef,
 )
+from afs_core.models.extraction import (
+    NormalizedDocument,
+    PageText,
+    QualityReport,
+    SourceDocument,
+)
 from afs_core.models.objects import (
     ObjectStat,
     PresignedPut,
@@ -22,11 +28,15 @@ __all__ = [
     "CatalogEntry",
     "ExtractionState",
     "NamespaceRecord",
+    "NormalizedDocument",
     "ObjectStat",
     "Page",
+    "PageText",
     "PresignedPut",
     "PrincipalRecord",
+    "QualityReport",
     "ScratchUsage",
+    "SourceDocument",
     "SourceRef",
     "SyncCheckpoint",
     "TenantRecord",
