@@ -35,6 +35,12 @@ resource "aws_s3_bucket_versioning" "tf_state" {
   }
 }
 
+# SSE-S3 (AES256), not SSE-KMS, is deliberate for the STATE bucket: a CMK here
+# adds cost and a bootstrap dependency (the key would have to exist before the
+# bucket that stores the key module's own state). The application *data* bucket
+# (storage module) uses SSE-KMS with the project CMK per plan §3.3 — this
+# exception is scoped to remote state only.
+#trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "tf_state" {
   bucket = aws_s3_bucket.tf_state.id
 
