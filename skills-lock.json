@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "postgres": {
+      "source": "timescale/pg-aiguide",
+      "sourceType": "github",
+      "skillPath": "skills/postgres/SKILL.md",
+      "computedHash": "e77e27a54d2f329f6304a05fedac2a407a98c8c59c044d0794d676165288006b"
+    },
+    "postgres-best-practices": {
+      "source": "neondatabase/postgres-skills",
+      "sourceType": "github",
+      "skillPath": "skills/postgres-best-practices/SKILL.md",
+      "computedHash": "76ad432ee02cdc525f24fe8a483b17de8a730c56118380852b60ce0159948a88"
+    },
+    "terraform-skill": {
+      "source": "antonbabenko/terraform-skill",
+      "sourceType": "github",
+      "skillPath": "skills/terraform-skill/SKILL.md",
+      "computedHash": "722acac542a5f0dafe69c3b1070eadc358453396d8e3f73e5430cf40c0eea538"
+    }
+  }
+}
