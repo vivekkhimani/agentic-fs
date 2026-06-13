@@ -24,3 +24,27 @@ variable "env" {
   type        = string
   default     = "sandbox"
 }
+
+variable "enable_compute" {
+  description = "Deploy the API Lambda + Function URL. Requires the image to be pushed to ECR first (see README)."
+  type        = bool
+  default     = false
+}
+
+variable "image_tag" {
+  description = "Tag of the API image in ECR that the Lambda runs."
+  type        = string
+  default     = "0.1.0"
+}
+
+variable "function_url_auth_type" {
+  description = "Function URL auth: AWS_IAM (signed callers only — safe default) or NONE (public; only with app-layer OAuth)."
+  type        = string
+  default     = "AWS_IAM"
+}
+
+variable "auth_mode" {
+  description = "AFS_AUTH_MODE for the deployed app (\"dev\" until the OAuth resource server lands)."
+  type        = string
+  default     = "dev"
+}

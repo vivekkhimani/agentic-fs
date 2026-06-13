@@ -30,6 +30,16 @@ output "catalog_table_arn" {
   value       = module.catalog.table_arn
 }
 
+output "ecr_repository_url" {
+  description = "Push the API image here (the Lambda pulls from it)."
+  value       = module.ecr.repository_url
+}
+
+output "function_url" {
+  description = "The API Function URL (null unless enable_compute = true)."
+  value       = var.enable_compute ? module.compute[0].function_url : null
+}
+
 output "region" {
   description = "AWS region this footprint is deployed into."
   value       = var.aws_region
