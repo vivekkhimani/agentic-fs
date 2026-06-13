@@ -6,51 +6,79 @@ documents in **your S3**, exposed through **MCP** (and REST). Multi-tenant,
 deploys with **one `terraform apply`**, ~**$2/month idle**, and **every stateful
 layer is swappable**.
 
-> Status: **early, building in the open.** The infrastructure substrate and the
-> contract layer are in place; the serving app is being assembled slice by slice.
-> See [`docs/build-progress.md`](docs/build-progress.md) for exactly where we are.
-> License: Apache-2.0.
+> **Status: early, building in the open.** The infra substrate, the contracts,
+> the stores, and a read-path API are in place; ingestion, search, and the cloud
+> deploy are next. Live status: [`docs/build-progress.md`](docs/build-progress.md).
+> License: Apache-2.0. Background & rationale: [`docs/agentic-fs-oss-plan.md`](docs/agentic-fs-oss-plan.md).
 
-## Why
+## Run it locally (5 minutes)
 
-The industry has converged on **agentic grep/read over a corpus** for insight
-work. agentic-fs is the thin, opinionated layer between S3 and an agent —
-tenancy, namespacing, authorization, a catalog, content search, and bounded
-reads — the parts a raw "point an MCP server at a bucket" approach can't give you.
-Full design: [`docs/agentic-fs-oss-plan.md`](docs/agentic-fs-oss-plan.md).
+**Requirements:** [Docker](https://docs.docker.com/get-docker/) ·
+[uv](https://docs.astral.sh/uv/getting-started/installation/) · `make`
+(macOS: `xcode-select --install`).
 
-## Repo layout
-
-```
-packages/
-  afs-core/      contracts (Protocols), DTOs, the key scheme, conformance kits   (pydantic only)
-  afs-server/    the service: stores, services, REST + MCP                        (implements afs-core)
-terraform/       modular IaC — global state/CI roles, per-layer modules, examples
-docs/            the plan, build progress, swap guides, and decision records (ADRs)
+```bash
+git clone https://github.com/vivekkhimani/agentic-fs && cd agentic-fs
+make dev          # builds the image, starts MinIO + DynamoDB Local + the API, seeds the bucket/table
+curl localhost:8080/v1/healthz      # {"status":"ok","version":"..."}
+curl localhost:8080/v1/me           # the local dev principal
+curl "localhost:8080/v1/fs/handbook/entries"   # [] until you ingest documents (ingestion lands next)
 ```
 
-## Swap anything
+`make down` stops it; `make clean` also wipes the volumes. The API is the same
+container image that runs on AWS Lambda/Fargate — see
+[ADR 0003](docs/decisions/0003-container-image.md).
 
-Every stateful layer sits behind a small contract with a conformance kit and a
-one-page swap guide — pick the infrastructure you already run:
-
-- **Object store** — S3, or any S3-compatible service (MinIO, **Cloudflare R2**,
-  Wasabi, B2) by setting one endpoint. [guide »](docs/swap-guides/object-store.md)
-- *(more guides land with each layer: catalog, search, extraction, compute, IdP)*
-
-The mechanism: a backend name in settings + entry-point discovery
-([ADR 0002](docs/decisions/0002-pluggable-backends-via-entry-points.md)).
+> Local dev uses a **static dev principal** (`AFS_AUTH_MODE=dev`) — never run that
+> in production; the OAuth resource server is a later slice.
 
 ## Develop
 
 ```bash
-# Python packages
-uv sync
-uv run pytest packages         # conformance kits run against in-memory + moto
-
-# Infrastructure
-cd terraform && terraform fmt -recursive .   # see terraform/README.md for the full flow
+uv sync           # set up the Python workspace (once)
+make test         # run the test suite
+make lint         # ruff lint + format check
+make fmt          # autoformat + autofix
+make help         # list every target
 ```
 
-CI gates every PR: `Python` (ruff + pytest) for `packages/**`, `Terraform`
+CI gates every PR: **Python** (ruff + pytest) for `packages/**`, **Terraform**
 (fmt/validate/tflint/trivy + a read-only plan) for `terraform/**`.
+
+## Layout
+
+```
+packages/
+  afs-core/      contracts (Protocols), DTOs, key scheme, conformance kits   (pydantic only)
+  afs-server/    stores, services, the FastAPI app                            (implements afs-core)
+terraform/       modular IaC — global state/CI roles, per-layer modules, examples
+docs/            the plan, build progress, swap guides, decision records (ADRs)
+Dockerfile       one image: Lambda + Fargate + local
+```
+
+## Swap any layer (plug-and-play)
+
+Each stateful layer sits behind a small contract with a conformance kit and a
+one-page guide — run it on the infrastructure you already have:
+
+| Layer | Swap to | Guide |
+|---|---|---|
+| Object store | S3 · MinIO · **Cloudflare R2** · Wasabi · B2 (often just an endpoint) | [object-store](docs/swap-guides/object-store.md) |
+| Catalog | DynamoDB · Postgres (BYO-RDS) | [catalog](docs/swap-guides/catalog.md) |
+| Compute | Lambda · Fargate · Cloudflare Worker (edge) | [compute](docs/swap-guides/compute.md) |
+
+How it works: a backend name in settings + entry-point discovery
+([ADR 0002](docs/decisions/0002-pluggable-backends-via-entry-points.md)).
+
+## Deploy to your AWS account
+
+`terraform/` provisions the whole footprint (state backend, CI roles, the data
+bucket, KMS, the catalog table, …) with per-layer modules and a `quickstart`
+example. Start with [`terraform/README.md`](terraform/README.md). *(The serving
+compute module + the live cloud deploy are in progress — see build-progress.)*
+
+## Learn more
+
+- [`docs/build-progress.md`](docs/build-progress.md) — what's built, what's next, the roadmap
+- [`docs/agentic-fs-oss-plan.md`](docs/agentic-fs-oss-plan.md) — the full design
+- [`docs/swap-guides/`](docs/swap-guides/) · [`docs/decisions/`](docs/decisions/) — per-layer swaps & ADRs

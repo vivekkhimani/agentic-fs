@@ -28,8 +28,8 @@ Both stores are certified by the afs-core conformance kits via `moto`.
   `fs/{ns}/{entries,stat,doc}`; dev auth (static principal, never prod); every
   `AfsError` rendered as RFC 9457 `problem+json`.
 
-The image (`../../Dockerfile`) runs this app on Lambda / Fargate / locally; `docker
-compose up` from the repo root runs it against MinIO + DynamoDB Local. Coming
+The image (`../../Dockerfile`) runs this app on Lambda / Fargate / locally;
+`make dev` from the repo root runs it against MinIO + DynamoDB Local. Coming
 next: the MCP mount (shares `FsService` in-process).
 
 ## Swapping a backend (plug-and-play)

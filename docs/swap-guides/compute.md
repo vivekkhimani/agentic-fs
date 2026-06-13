@@ -8,7 +8,7 @@ operate — the application code is identical.
 |---|---|---|
 | **Lambda + Function URL** (default) | the image's AWS Lambda Web Adapter forwards invocations (incl. streaming) to uvicorn; deploy via the `compute_lambda` Terraform module | near-$0 idle, bursty traffic, no servers to run |
 | **Fargate / ECS** | run the *same* image behind an ALB; deploy via `compute_fargate` (+ `network`) | always-on, no cold starts, heavy OCR |
-| **Local** | `docker compose up` (MinIO + DynamoDB Local + the api) | development |
+| **Local** | `make dev` (MinIO + DynamoDB Local + the api) | development |
 
 These three are the same process (uvicorn) — no code change, just where it runs.
 

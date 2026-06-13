@@ -42,8 +42,8 @@ serving layer can be built against real backends.
 
 The API is **containerized** ([`Dockerfile`](../Dockerfile), [ADR 0003](decisions/0003-container-image.md)):
 one multi-stage, non-root, ~190 MB image runs uvicorn on **Lambda (Web Adapter) +
-Fargate + locally** — verified to build and serve `/v1/healthz`. `docker compose
-up` runs it against MinIO + DynamoDB Local.
+Fargate + locally** — verified to build and serve `/v1/healthz`. `make dev` runs
+it against MinIO + DynamoDB Local.
 
 **Both stores done.** Swap-ability is real and demonstrated:
 - object store — the S3 store *is* the store for any S3-compatible endpoint

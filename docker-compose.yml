@@ -12,8 +12,8 @@ services:
       MINIO_ROOT_USER: local
       MINIO_ROOT_PASSWORD: localsecret
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:9000:9000"   # S3 API
+      - "127.0.0.1:9001:9001"   # console
     volumes:
       - minio-data:/data
     healthcheck:
@@ -32,28 +32,27 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  init:
+  # One-shot aws CLI for `make seed` (create bucket + table). In the "tools"
+  # profile so it never starts on `docker compose up`; invoked via
+  # `docker compose run --rm awscli ...`. Dummy creds, local endpoints only.
+  awscli:
     image: amazon/aws-cli:2.27.0
-    depends_on:
-      minio:
-        condition: service_healthy
-      dynamodb:
-        condition: service_started
+    profiles: ["tools"]
     environment:
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: localsecret
       AWS_DEFAULT_REGION: us-east-1
-    entrypoint: ["/bin/sh", "/scripts/local-init.sh"]
-    volumes:
-      - ./scripts:/scripts:ro
+    entrypoint: ["aws"]
 
   api:
     build:
       context: .
       target: runtime
     depends_on:
-      init:
-        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+      dynamodb:
+        condition: service_started
     environment:
       AFS_OBJECT_STORE_BACKEND: s3
       AFS_S3_ENDPOINT_URL: http://minio:9000
