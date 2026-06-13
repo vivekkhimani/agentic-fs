@@ -52,3 +52,11 @@ class ScratchUsage(BaseModel):
     bytes_used: int = 0
     objects_used: int = 0
     quota_bytes: int | None = None
+
+
+class SyncCheckpoint(BaseModel):
+    """A connector's persisted sync cursor (checkpoints live server-side)."""
+
+    connector_id: str
+    cursor: str | None = None
+    updated_at: datetime | None = None
