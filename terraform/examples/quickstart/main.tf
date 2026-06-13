@@ -31,3 +31,38 @@ module "catalog" {
   name_prefix = var.name_prefix
   kms_key_arn = module.kms.key_arn
 }
+
+# M1 — serving compute: the API image repository + the Lambda behind a Function URL.
+module "ecr" {
+  source = "../../modules/ecr_mirror"
+
+  name_prefix = var.name_prefix
+}
+
+# The Lambda exec role must inherit the CI permissions boundary; read its ARN
+# from the ci-roles root's state rather than hardcoding it.
+data "terraform_remote_state" "ci_roles" {
+  backend = "s3"
+  config = {
+    bucket = "agentic-fs-terraform-state-${var.aws_account_id}"
+    key    = "global/ci-roles.tfstate"
+    region = "us-east-1"
+  }
+}
+
+module "compute" {
+  source = "../../modules/compute_lambda"
+  count  = var.enable_compute ? 1 : 0
+
+  name_prefix              = var.name_prefix
+  image_uri                = "${module.ecr.repository_url}:${var.image_tag}"
+  region                   = var.aws_region
+  data_bucket_name         = module.storage.bucket_name
+  data_bucket_arn          = module.storage.bucket_arn
+  catalog_table_name       = module.catalog.table_name
+  catalog_table_arn        = module.catalog.table_arn
+  kms_key_arn              = module.kms.key_arn
+  permissions_boundary_arn = data.terraform_remote_state.ci_roles.outputs.permissions_boundary_arn
+  function_url_auth_type   = var.function_url_auth_type
+  auth_mode                = var.auth_mode
+}

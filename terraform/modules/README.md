@@ -21,9 +21,9 @@ the apply role's write scope is widened in lockstep (see
 | `storage` | ✅ done | data bucket, policy, lifecycle, EventBridge enable (access-logs bucket deferred) | `name_prefix`, `account_id`, `kms_key_arn`, `scratch_ttl_days`, `tenants_noncurrent_days`, `enable_intelligent_tiering`, `quarantine_exempt_role_arns` | `bucket_name`, `bucket_arn` |
 | `catalog_dynamodb` | ✅ done | table + 3 GSIs + TTL + PITR + deletion protection (default catalog) | `name_prefix`, `kms_key_arn`, `deletion_protection_enabled`, `point_in_time_recovery_enabled` | `table_name`, `table_arn`, `table_stream_arn` |
 | `ingestion` | 📝 scaffold | EventBridge rules, SQS + DLQ, extractor Lambda + ESM, reconciler, scheduler | `bucket_*`, `table_*`, `extractor_image_uri`, `max_concurrency`, `reconcile_schedule`, `enable_scan_gate` | `extract_queue_arn`, `dlq_arn` |
-| `compute_lambda` | 📝 scaffold (next) | api Lambda, Function URL (stream), exec role, ABAC tenant-scoped role (default serving compute) | `api_image_uri`, `bucket_*`, `table_*`, `permissions_boundary_arn`, `oidc_issuer`, `oidc_audience`, `auth_mode`, `enable_session_policy_scoping`, `enable_scratch`, `search_kb_id`, `provisioned_concurrency` | `function_url`, `api_role_arn` |
+| `compute_lambda` | ✅ done | api Lambda (image) + streaming Function URL + boundary-bound exec role (least-priv read) | `image_uri`, `bucket_*`, `catalog_table_*`, `kms_key_arn`, `permissions_boundary_arn`, `function_url_auth_type`, `auth_mode`, `memory_mb`, `timeout_seconds` | `function_url`, `function_arn`, `exec_role_arn` |
 | `observability` | 📝 scaffold | log groups, SNS topic, 5 alarms, optional dashboard/budget/CloudTrail | function/queue names, `alarm_email`, `log_retention_days` | `alerts_topic_arn` |
-| `ecr_mirror` | 📝 scaffold | private ECR repos + pinned-version image copy (Lambda needs same-account ECR) | `name_prefix`, `release_version` | `api_repo_url`, `extractor_repo_url` |
+| `ecr_mirror` | ✅ done | private ECR repo for the API image (image-mirror half deferred) | `name_prefix`, `untagged_expiry_days` | `repository_url`, `repository_arn` |
 
 ## Optional modules (flag-gated)
 

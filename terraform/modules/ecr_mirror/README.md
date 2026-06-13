@@ -1,15 +1,29 @@
-# `ecr_mirror` — ECR mirror
+# `ecr_mirror` — ECR repository for the API image
 
-**Status: scaffold (not yet implemented).** Default footprint.
+Private ECR repository the API container image is pushed to. Lambda can only
+pull images from same-account ECR, so this is where the published image lives.
 
-Private ECR repositories plus a pinned-version copy of the published API/extractor images (Lambda requires same-account ECR).
+## Resources
 
-The full input/output contract for this module lives in the index table in
-[`../README.md`](../README.md). It will be implemented per the milestone plan
-(`docs/agentic-fs-oss-plan.md` §11, §15); when it lands, add its mutating IAM
-actions to the apply role's `apply_writes` scope in
-[`../../global/ci-roles`](../../global/ci-roles) in the same change.
+- `aws_ecr_repository.api` — `<name_prefix>-api`, scan-on-push, AES256.
+- `aws_ecr_lifecycle_policy.api` — expire untagged images after N days.
 
-Conventions: HashiCorp style-guide layout (`terraform.tf`/`main.tf`/`variables.tf`/`outputs.tf`),
-typed + documented variables, `<name_prefix>-<component>` naming, no
-backend/provider block (composed from the example roots).
+## Inputs
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `name_prefix` | string | — | Repo name prefix (`<name_prefix>-api`). |
+| `untagged_expiry_days` | number | `14` | Expire untagged images after N days. |
+
+## Outputs
+
+| Name | Description |
+|---|---|
+| `repository_url` | Push images here; the Lambda pulls from it. |
+| `repository_arn` | Repository ARN. |
+
+## Deferred
+
+The "mirror upstream pinned images" half of the original contract (copying
+published base/runtime images into this account) is deferred — this module
+implements the repo the API image uses.

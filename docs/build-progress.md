@@ -124,10 +124,11 @@ step of the read path, when the app actually serves requests — no premature sh
 ✅ afs-server: DynamoDB CatalogStore (certified by the same kit)
 ✅ afs-server: FsService read path + FastAPI app + Dockerfile + docker-compose
 ✅ afs-server: MCP mount at /mcp (whoami/fs_list/fs_stat/fs_read, shared FsService)
+✅ ecr_mirror + compute_lambda modules — wired into quickstart; ECR repo LIVE
+🔧 deploy: image build done; ECR push pending (env upload limit) → then
+      `enable_compute=true` apply creates the Lambda + Function URL (AWS_IAM)
 ⏭️ ingestion + extraction → documents actually land and become readable          ← next
       (until then the read path + MCP tools work but the corpus is empty)
-⏭️ ecr_mirror (push image) → compute_lambda (deploy, Function URL)
-      → pointed at the LIVE bucket + catalog                       ← the AWS hookup
 ```
 
 When `compute_lambda` lands it is the **first IAM-role-creating module**, so it
@@ -139,6 +140,12 @@ from the `ci-roles` output (the boundary's escalation-prevention deny enforces i
 
 Tracked here so they aren't lost — intentionally *not* built yet.
 
+- **`compute_fargate` + `network` (alternate compute)** — the same image behind
+  an ALB on ECS for always-on / no-cold-start / OCR-at-scale. Deferred to the
+  **"release configs" milestone** (alongside the `hardened`/`full` example roots):
+  it pulls in a VPC + ALB + ECS service (~$36+/mo while up, real teardown), and
+  the default Lambda path already proves the image runs. Implement it as a
+  deliberate config option for the OSS release, not a throwaway test now.
 - **MCP edge Worker (Cloudflare)** — optional edge layer that terminates MCP +
   OAuth and calls the REST data plane (plan §7.1; `docs/swap-guides/compute.md`).
   **Deferred on purpose:** its client + tools table are *generated* from
