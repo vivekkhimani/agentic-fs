@@ -1,0 +1,48 @@
+# uv workspace root. Holds shared tool config + the dev dependency group; the
+# distributable packages live under packages/* (see docs/agentic-fs-oss-plan.md
+# §2.4). The root itself is not a published package.
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+# --- Shared lint/format config (packages inherit this by config discovery) ---
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["packages/*/src", "packages/*/tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W", # pyflakes / pycodestyle
+    "I", # isort
+    "UP", # pyupgrade
+    "B", # bugbear
+    "SIM", # simplify
+    "TID", # tidy-imports
+    "RUF", # ruff-specific
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["afs_core", "afs_server", "afs_connector_sdk"]
+
+# --- Type checker (Astral ty) ---
+[tool.ty.environment]
+python-version = "3.12"
+
+# --- Tests ---
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["packages"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

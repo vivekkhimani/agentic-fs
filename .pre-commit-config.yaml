@@ -71,7 +71,7 @@ repos:
   # Python — Ruff (lint + format). Inert until the uv workspace lands under
   # packages/ (M0); the `files` filter scopes it there.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.2
+    rev: v0.15.17 # keep in sync with the ruff pin in pyproject.toml dev deps
     hooks:
       - id: ruff
         args: [--fix]
