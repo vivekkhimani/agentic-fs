@@ -31,7 +31,19 @@ IAM, so the live count via that API shows the four non-IAM resources + the
 boundary policy.)
 
 **All M1 stateful dependencies now exist** — CMK + data bucket + catalog — so the
-serving layer (`compute_lambda`) can be built against real backends.
+serving layer can be built against real backends.
+
+### Application track (local-first, no AWS deploy yet)
+
+| Package | What's in it | Tests |
+|---|---|---|
+| `afs-core` | the contracts (`ObjectStore`/`CatalogStore` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** | 50 |
+| `afs-server` | `settings`, the **pluggable store registry** (builtins + `afs.object_stores` entry points), and `S3ObjectStore` — certified by the afs-core kit via `moto` | +9 |
+
+Swap-ability is real and demonstrated: the S3 store *is* the store for any
+S3-compatible endpoint (MinIO, Cloudflare R2, Wasabi, B2) via one env var —
+[swap guide](swap-guides/object-store.md),
+[ADR 0002](decisions/0002-pluggable-backends-via-entry-points.md).
 
 ## How the infrastructure maps to the architecture
 
@@ -89,29 +101,22 @@ ci-roles change**. The one rule to remember: any module that creates an IAM role
 (first: `compute_lambda` in M1) must set `permissions_boundary` to the
 `permissions_boundary_arn` output, or the boundary denies its creation.
 
-## Next wave: `compute_lambda` (the serving surface)
+## The runway to "image + AWS"
 
-With the bucket + CMK + catalog in place, the next piece is the API/MCP serving
-layer: an `agentic-fs-api` Lambda behind a streaming **Function URL**, its
-execution role, and a log group. This is the **MCP-first** pillar made real — the
-first thing an agent actually talks to.
+We build and test **locally first**; the container image + AWS deploy is the last
+step of the read path, when the app actually serves requests — no premature shell.
 
-Two things make this step distinct from M0/M1:
+```
+✅ afs-core foundations (keys/errors/models)
+✅ afs-core contracts + conformance kits
+✅ afs-server: settings + store registry + S3 ObjectStore (moto-certified)
+⏭️ afs-server: DynamoDB CatalogStore (certified by the same kit)   ← next
+⏭️ thin FastAPI/FastMCP read app (list/read) → prove locally on docker-compose
+⏭️ Dockerfile → image → ecr_mirror (push) → compute_lambda (deploy, Function URL)
+      → pointed at the LIVE bucket + catalog                       ← the AWS hookup
+```
 
-1. **First IAM-role-creating module.** The Lambda execution role is where the
-   permissions-boundary rule first applies: the module takes a
-   `permissions_boundary_arn` variable and sets it on the role, and the
-   quickstart root threads the `ci-roles` `permissions_boundary_arn` output
-   through. (Designed for — see `terraform/DECISIONS.md` §2a.)
-2. **Needs a container image.** The real Lambda is the FastAPI/FastMCP app
-   (`afs-server`), which doesn't exist yet. So there's a fork:
-   - **(a) infra-complete, image-deferred** — build the full module against a
-     placeholder image so it `plan`s/`apply`s now and is boundary-validated
-     end-to-end; point it at the real image once the app lands. *Keeps the
-     infra-first cadence.*
-   - **(b) pivot to the app packages** (`afs-core` / `afs-server`) so there's a
-     real image to deploy, then return and wire compute.
-
-Recommendation: **(a)** — finish provisioning the serverless spine and prove the
-boundary requirement, then swap in the real image. To be confirmed before we
-start (brainstorm pending).
+When `compute_lambda` lands it is the **first IAM-role-creating module**, so it
+takes a `permissions_boundary_arn` and sets it on the Lambda exec role, threaded
+from the `ci-roles` output (the boundary's escalation-prevention deny enforces it
+— `terraform/DECISIONS.md` §2a).

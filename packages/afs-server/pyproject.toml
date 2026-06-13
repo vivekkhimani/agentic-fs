@@ -1,0 +1,22 @@
+[project]
+name = "afs-server"
+version = "0.1.0"
+description = "agentic-fs server: stores, services, REST + MCP. Implements the afs-core contracts."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "afs-core",
+    "boto3>=1.34",
+    "pydantic-settings>=2.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/afs_server"]
+
+[tool.uv.sources]
+afs-core = { workspace = true }
