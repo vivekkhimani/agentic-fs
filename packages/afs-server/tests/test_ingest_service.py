@@ -7,6 +7,7 @@ import pytest
 from afs_core.errors import InsufficientScopeError
 from afs_core.testing import InMemoryCatalogStore, InMemoryObjectStore
 from afs_server.auth import TenantContext
+from afs_server.extraction import build_pipeline
 from afs_server.services import FsService, IngestService
 
 _CTX = TenantContext(tenant_id="acme", principal_id="p", scopes=frozenset({"ingest", "fs:read"}))
@@ -15,7 +16,7 @@ _CTX = TenantContext(tenant_id="acme", principal_id="p", scopes=frozenset({"inge
 @pytest.fixture
 def services() -> tuple[IngestService, FsService]:
     catalog, objects = InMemoryCatalogStore(), InMemoryObjectStore()
-    return IngestService(catalog, objects), FsService(catalog, objects)
+    return IngestService(catalog, objects, build_pipeline()), FsService(catalog, objects)
 
 
 async def test_text_document_is_ingested_and_readable(

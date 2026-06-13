@@ -36,3 +36,6 @@ npm-debug.log*
 *.tfstate.*
 *.tfplan
 .terraform/
+
+# Agent worktrees (isolated background-agent checkouts)
+.claude/worktrees/

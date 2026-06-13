@@ -33,7 +33,11 @@ def get_fs_service(request: Request) -> FsService:
 
 
 def get_ingest_service(request: Request) -> IngestService:
-    return IngestService(request.app.state.catalog, request.app.state.objects)
+    return IngestService(
+        request.app.state.catalog,
+        request.app.state.objects,
+        request.app.state.extraction_pipeline,
+    )
 
 
 def get_principal(settings: Annotated[Settings, Depends(get_settings)]) -> TenantContext:

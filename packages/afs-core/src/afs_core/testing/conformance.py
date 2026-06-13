@@ -12,13 +12,14 @@ from datetime import UTC, datetime
 
 import pytest
 
-from afs_core.contracts import CatalogStore, ObjectStore
+from afs_core.contracts import CatalogStore, Normalizer, ObjectStore
 from afs_core.errors import NotFoundError, QuotaExceededError
 from afs_core.models import (
     CatalogEntry,
     ExtractionState,
     NamespaceRecord,
     PrincipalRecord,
+    SourceDocument,
     SyncCheckpoint,
     TenantRecord,
 )
@@ -190,3 +191,30 @@ class CatalogStoreConformance:
             await store.adjust_scratch_usage("a", "p", delta_bytes=60, delta_objects=1)
         # Atomic: the rejected adjustment left usage unchanged.
         assert (await store.get_scratch_usage("a", "p")).bytes_used == 60
+
+
+class NormalizerConformance:
+    """Certifies a ``Normalizer`` implementation.
+
+    Override two fixtures: ``normalizer`` (your impl) and ``sample`` (a
+    ``SourceDocument`` it accepts, pointing at a real file on disk).
+    """
+
+    @pytest.fixture
+    def normalizer(self) -> Normalizer:
+        raise NotImplementedError("override `normalizer` to point at your impl")
+
+    @pytest.fixture
+    def sample(self) -> SourceDocument:
+        raise NotImplementedError("override `sample` with a doc your normalizer accepts")
+
+    def test_accepts_its_sample(self, normalizer: Normalizer, sample: SourceDocument) -> None:
+        assert normalizer.accepts(sample) is True
+
+    async def test_normalize_produces_pages(
+        self, normalizer: Normalizer, sample: SourceDocument
+    ) -> None:
+        result = await normalizer.normalize(sample)
+        assert result.pages, "a successful normalize must yield at least one page"
+        assert all(p.number >= 1 for p in result.pages)
+        assert result.quality.page_count == len(result.pages)

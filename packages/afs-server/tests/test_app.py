@@ -13,6 +13,7 @@ from afs_core.models import ExtractionState
 from afs_core.testing import InMemoryCatalogStore, InMemoryObjectStore, make_entry
 from afs_server.app import create_app
 from afs_server.dependencies import get_catalog, get_fs_service, get_ingest_service
+from afs_server.extraction import build_pipeline
 from afs_server.services import FsService, IngestService
 
 
@@ -47,7 +48,9 @@ def client() -> Iterator[TestClient]:
     _seed(catalog, objects)
     app = create_app()
     app.dependency_overrides[get_fs_service] = lambda: FsService(catalog, objects)
-    app.dependency_overrides[get_ingest_service] = lambda: IngestService(catalog, objects)
+    app.dependency_overrides[get_ingest_service] = lambda: IngestService(
+        catalog, objects, build_pipeline()
+    )
     app.dependency_overrides[get_catalog] = lambda: catalog
     with TestClient(app) as c:
         yield c

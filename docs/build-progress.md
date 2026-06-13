@@ -141,10 +141,13 @@ from the `ci-roles` output (the boundary's escalation-prevention deny enforces i
 
 **Product — toward a demoable v1:**
 
-- **Ingestion & extraction (M2)** *(next)* — the write path (upload intent → S3 →
-  catalog row), event-driven cataloger + extractor (Docling), `catalog_only`
-  degradation, the reconciler, and the connector SDK + `fs-crawler`. *The biggest
-  unlock — makes the corpus non-empty so `fs_list`/`fs_read` return real docs.*
+- **Ingestion & extraction (M2)** — write path ✅ (`put_document` → S3 + catalog
+  row); extraction is a **pluggable `Normalizer` contract** ✅ (`ExtractionPipeline`
+  ladder; `text_native` rung shipped, `docling`/your-own register via
+  `afs.normalizers` — [ADR 0006](decisions/0006-extraction-normalizer-contract.md),
+  [swap guide](swap-guides/extraction.md)). *Next on this track:* the event-driven
+  extractor worker (S3→SQS→pipeline), the connector SDK + `fs-crawler`, the
+  presigned-upload flow, and the reconciler.
 - **Grep, scratch, budgets (M3)** — two-stage grep, glob, the scratch namespace,
   and the full MCP middleware (per-call enforcement, budgets, audit log).
 - **OAuth 2.1 resource server** (+ `auth_cognito`) — replaces dev-auth; required
