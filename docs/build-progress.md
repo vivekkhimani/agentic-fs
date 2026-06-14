@@ -103,8 +103,11 @@ it — so the system is demoable at every step (plan §15).
   engine with structure-preserving + multimodal rungs (`textract_analyze` ✅, `llm` ✅),
   cascade/content-type/optional-LLM routing ([ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)).
   The quality gate now escalates on **confidence** (`AFS_MIN_CONFIDENCE`) as well as
-  char count ✅ — shaky OCR can fall through to a stronger rung.
-  Then Drive's delta `changes.list` (L2) + SharePoint. *Exit:* a corrupt PDF lands
+  char count ✅ — shaky OCR can fall through to a stronger rung. The **Haystack
+  engine** is wired (phase 1) — `AFS_PIPELINE_ENGINE=haystack` runs the cascade as a
+  Haystack `AsyncPipeline` (rungs as components), behavior-equivalent to the ladder
+  and opt-in (the `[haystack]` extra) ✅; making it the default + content-type/YAML
+  routing is phase 2. Then Drive's delta `changes.list` (L2) + SharePoint. *Exit:* a corrupt PDF lands
   `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
   - **Backlog (post-engine):** ship a set of **pre-packaged Haystack pipeline
     presets** users pick from instead of wiring components themselves — e.g.

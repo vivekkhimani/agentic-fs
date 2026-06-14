@@ -17,7 +17,7 @@ from afs_server.extraction.docx import DocxNormalizer
 from afs_server.extraction.llm import LlmNormalizer
 from afs_server.extraction.pdf import PdfNormalizer
 from afs_server.extraction.pdftables import PdfTablesNormalizer
-from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline
+from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline, ExtractionRunner
 from afs_server.extraction.rapidocr import RapidOcrNormalizer
 from afs_server.extraction.runner import run_extraction
 from afs_server.extraction.tesseract import TesseractNormalizer
@@ -68,18 +68,41 @@ def build_pipeline(
     *,
     min_chars_per_page: int = 1,
     min_confidence: float = 0.0,
-) -> ExtractionPipeline:
+    engine: str = "ladder",
+) -> ExtractionRunner:
     """Build the extraction pipeline from a ladder of normalizer names.
 
     ``min_confidence`` (0..1) escalates a low-confidence result (e.g. shaky OCR) to
-    the next rung; 0.0 (default) never gates on confidence.
+    the next rung; 0.0 (default) never gates on confidence. ``engine`` selects the
+    built-in linear ladder (default) or the Haystack engine (ADR 0010) — both walk
+    the same rungs and honour the same gate.
     """
     names = ladder or DEFAULT_LADDER
+    normalizers = [_build_normalizer(n) for n in names]
+    if engine == "haystack":
+        try:
+            from afs_server.extraction.haystack_engine import HaystackExtractionPipeline
+        except ModuleNotFoundError as err:  # extra not installed
+            raise ValueError(
+                "AFS_PIPELINE_ENGINE=haystack requires the optional extra: "
+                "pip install 'afs-server[haystack]'"
+            ) from err
+        return HaystackExtractionPipeline(
+            normalizers, min_chars_per_page=min_chars_per_page, min_confidence=min_confidence
+        )
+    if engine != "ladder":
+        raise ValueError(f"unknown AFS_PIPELINE_ENGINE {engine!r}; use 'ladder' or 'haystack'")
     return ExtractionPipeline(
-        [_build_normalizer(n) for n in names],
+        normalizers,
         min_chars_per_page=min_chars_per_page,
         min_confidence=min_confidence,
     )
 
 
-__all__ = ["ExtractionOutcome", "ExtractionPipeline", "build_pipeline", "run_extraction"]
+__all__ = [
+    "ExtractionOutcome",
+    "ExtractionPipeline",
+    "ExtractionRunner",
+    "build_pipeline",
+    "run_extraction",
+]
