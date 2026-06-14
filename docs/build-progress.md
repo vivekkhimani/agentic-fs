@@ -135,9 +135,10 @@ it — so the system is demoable at every step (plan §15).
   run through it ([tools swap-guide](swap-guides/tools.md)). The **two-stage
   budgeted `fs_grep`** (catalog coarse-filter → regex on the candidates' derived
   text, with file/match/byte budgets + a `truncated` signal) and **`fs_glob`**
-  have landed ✅. Next: the **scratch** workspace tools, then generic per-call
-  **budgets** in the middleware. *Exit:* an agent greps a 1k-file corpus under
-  budget.
+  have landed ✅. The **scratch** workspace tools (`scratch_write`/`read`/`list`/
+  `delete` on the catalog's atomic quota, `fs:write:scratch`) have landed ✅. Next:
+  generic per-call **budgets** in the middleware (an output-size safety net beyond
+  each tool's own caps). *Exit:* an agent greps a 1k-file corpus under budget.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
   `compute_fargate`/`network`, `observability`, `security_guardduty`,
   `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));

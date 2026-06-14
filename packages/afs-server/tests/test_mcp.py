@@ -12,7 +12,7 @@ from afs_core import keys
 from afs_core.models import ExtractionState
 from afs_core.testing import InMemoryCatalogStore, InMemoryObjectStore, make_entry
 from afs_server.mcp import build_mcp
-from afs_server.services import FsService
+from afs_server.services import FsService, ScratchService
 from afs_server.settings import Settings
 
 
@@ -38,14 +38,25 @@ async def client() -> AsyncIterator[Client]:
             extraction=ExtractionState(status="catalog_only", reason="encrypted"),
         )
     )
-    mcp = build_mcp(FsService(catalog, objects), Settings())
+    mcp = build_mcp(FsService(catalog, objects), Settings(), ScratchService(catalog, objects))
     async with Client(mcp) as c:
         yield c
 
 
 async def test_tools_are_listed(client: Client) -> None:
     names = {t.name for t in await client.list_tools()}
-    assert {"whoami", "fs_list", "fs_stat", "fs_read", "fs_glob", "fs_grep"} <= names
+    assert {
+        "whoami", "fs_list", "fs_stat", "fs_read", "fs_glob", "fs_grep",
+        "scratch_write", "scratch_read", "scratch_list", "scratch_delete",
+    } <= names  # fmt: skip
+
+
+async def test_scratch_roundtrip(client: Client) -> None:
+    w = await client.call_tool("scratch_write", {"path": "draft.md", "content": "wip notes"})
+    assert w.data["objects_used"] == 1
+    r = await client.call_tool("scratch_read", {"path": "draft.md"})
+    assert r.data["content"] == "wip notes"
+    assert (await client.call_tool("scratch_list", {})).data["paths"] == ["draft.md"]
 
 
 async def test_fs_glob(client: Client) -> None:

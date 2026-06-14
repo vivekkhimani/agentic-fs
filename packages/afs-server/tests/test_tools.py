@@ -9,7 +9,7 @@ from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
 
 from afs_core.testing import InMemoryCatalogStore, InMemoryObjectStore
-from afs_server.services import FsService
+from afs_server.services import FsService, ScratchService
 from afs_server.settings import Settings
 from afs_server.tools import ToolDeps, ToolMiddleware, build_tools
 
@@ -37,9 +37,8 @@ class _NeedsBogusScope:
 
 @pytest.fixture
 async def client() -> AsyncIterator[Client]:
-    deps = ToolDeps(
-        fs=FsService(InMemoryCatalogStore(), InMemoryObjectStore()), settings=Settings()
-    )
+    cat, obj = InMemoryCatalogStore(), InMemoryObjectStore()
+    deps = ToolDeps(fs=FsService(cat, obj), scratch=ScratchService(cat, obj), settings=Settings())
     mcp: FastMCP = FastMCP("t")
     tools = [*build_tools(), _NeedsBogusScope()]
     for tool in tools:

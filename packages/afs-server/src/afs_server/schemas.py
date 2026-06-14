@@ -60,3 +60,21 @@ class GrepResponse(BaseModel):
     matches: list[GrepMatch]
     files_searched: int
     truncated: bool  # a budget (files/matches/bytes) was hit — narrow the query
+
+
+class ScratchWriteResult(BaseModel):
+    """Result of a scratch write/delete, with the principal's quota usage after."""
+
+    path: str
+    bytes: int  # bytes written (0 for delete)
+    bytes_used: int
+    objects_used: int
+
+
+class ScratchReadResult(BaseModel):
+    path: str
+    content: str
+
+
+class ScratchListResult(BaseModel):
+    paths: list[str]

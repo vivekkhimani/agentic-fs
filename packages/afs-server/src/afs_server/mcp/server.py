@@ -15,13 +15,13 @@ from fastmcp import FastMCP
 from afs_server.tools import ToolDeps, ToolMiddleware, build_tools
 
 if TYPE_CHECKING:
-    from afs_server.services import FsService
+    from afs_server.services import FsService, ScratchService
     from afs_server.settings import Settings
 
 
-def build_mcp(fs: FsService, settings: Settings) -> FastMCP:
+def build_mcp(fs: FsService, settings: Settings, scratch: ScratchService) -> FastMCP:
     mcp: FastMCP = FastMCP("agentic-fs")
-    deps = ToolDeps(fs=fs, settings=settings)
+    deps = ToolDeps(fs=fs, scratch=scratch, settings=settings)
     tools = build_tools()
     for tool in tools:
         tool.register(mcp, deps)
