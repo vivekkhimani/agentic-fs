@@ -1,7 +1,7 @@
 # agentic-fs — build progress & roadmap
 
 > A living map from **what we've built** to **the vision** (`agentic-fs-oss-plan.md`).
-> Updated as each slice lands. Last updated: 2026-06-13.
+> Updated as each slice lands. Last updated: 2026-06-14.
 
 ## The vision in one line
 
@@ -23,27 +23,30 @@ lands into a pipeline and a data model already proven safe.
 | `alias/agentic-fs-data` → CMK | **SSE-KMS everywhere** — the encryption floor of the security model |
 | `agentic-fs-data-…` (S3) | **S3 is canonical** — the single source of truth the whole system heals from |
 | `agentic-fs-catalog` (DynamoDB) | The **derived index** of S3 — fast `list`/`glob`/`stat`; healable; first-class `catalog_only` |
+| `agentic-fs-api` (Lambda container) + streaming Function URL | **Serving compute is live** — the MCP+REST surface, rolled by image CD; exec role now carries the ingestion write path |
 
-Five tag-discoverable resources (`Project=agentic-fs`), so the entire footprint
+Tag-discoverable resources (`Project=agentic-fs`), so the entire footprint
 is teardown-by-one-query — a design goal from day one, not an afterthought.
 (IAM roles are tagged too but the Resource Groups Tagging API can't enumerate
-IAM, so the live count via that API shows the four non-IAM resources + the
-boundary policy.)
+IAM.)
 
-**All M1 stateful dependencies now exist** — CMK + data bucket + catalog — so the
-serving layer can be built against real backends.
+**The full read *and* write loop is live on AWS:** a SigV4 caller `PUT`s a
+document to the Function URL → it lands in S3 (SSE-KMS), is extracted
+(`text_native`), and a catalog row appears → `fs/stat`/`read` return it →
+`delete` removes it. Same loop is proven locally on MinIO + DynamoDB Local.
 
-### Application track (local-first, no AWS deploy yet)
+### Application track (deployed — API + ingestion live on AWS)
 
 | Package | What's in it | Tests |
 |---|---|---|
 | `afs-core` | the contracts (`ObjectStore`/`CatalogStore` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** | 50 |
-| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}`), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read` over the same `FsService`, in-process) | +41 |
+| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + `ExtractionPipeline` write path** (`Normalizer` contract, `text_native` rung, [ADR 0006](decisions/0006-extraction-normalizer-contract.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read` over the same `FsService`, in-process) | +41 |
 
 The API is **containerized** ([`Dockerfile`](../Dockerfile), [ADR 0003](decisions/0003-container-image.md)):
 one multi-stage, non-root, ~190 MB image runs uvicorn on **Lambda (Web Adapter) +
-Fargate + locally** — verified to build and serve `/v1/healthz`. `make dev` runs
-it against MinIO + DynamoDB Local.
+Fargate + locally** — live on the Function URL, rolled on merge by image CD
+([ADR 0004](decisions/0004-image-cd.md)). `make dev` runs it against MinIO +
+DynamoDB Local.
 
 **Both stores done.** Swap-ability is real and demonstrated:
 - object store — the S3 store *is* the store for any S3-compatible endpoint
@@ -67,8 +70,8 @@ Status against each:
 | Data bucket (`tenants/`+`derived/`+`scratch/`) | `storage` | ✅ done | **S3 is canonical; everything else is derived and healable from it** (the load-bearing principle) |
 | Encryption / tenancy floor | `kms` | ✅ done | **Multi-tenant, enterprise-secure by default** — SSE-KMS on every object |
 | Catalog (list/glob/stat index) | `catalog_dynamodb` (default) / `catalog_postgres` | ✅ done | The **derived index** of S3 — navigation without O(corpus) S3 LISTs; healable; **swappable** |
-| Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | ⏭️ **next** | **MCP-first, agent-shaped** — Function URL streaming + OAuth resource server + enforcement boundary |
-| Ingest → extract → heal | `ingestion` | M2 | **S3 events drive a serverless pipeline**; the reconciler *is* "rebuildable from S3" |
+| Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | ✅ done (live) | **MCP-first, agent-shaped** — streaming Function URL (AWS_IAM); OAuth resource server + enforcement boundary still to come |
+| Ingest → extract → heal | `ingestion` | 🔧 write path done (live) | **In-request** `PUT`→extract→catalog works end-to-end; the **async S3-event pipeline** (EventBridge → SQS → worker) + reconciler are the next slice |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
 | OAuth IdP (optional) | `auth_cognito` | M1/opt | OAuth 2.1 resource server, batteries-included, $0 under free tier |
 | Malware gate, audit, alarms | `security_guardduty`, `observability` | opt | Enterprise hardening — none of it bolted on later |
@@ -82,12 +85,14 @@ it — so the system is demoable at every step (plan §15).
   boundary, CI (validate → plan → gated sandbox apply → weekly drift), tflint +
   trivy gates, tagging, module/example scaffolds.
 - **M0 — Foundation** ✅ — `kms` + `storage`. S3-is-canonical is now real.
-- **M1 — Read path** 🔧 in progress — `catalog_dynamodb` ✅ done →
-  `compute_lambda` (next) + dev auth → an agent can `list`/`read` a seeded corpus
-  over MCP. *Exit:* Claude Desktop reads the corpus end-to-end.
-- **M2 — Ingestion & extraction** — `ingestion` (EventBridge → SQS → Docling
-  extractor → `derived/` + catalog rows) + the reconciler. *Exit:* a corrupt PDF
-  lands `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
+- **M1 — Read path** ✅ — `catalog_dynamodb` + `compute_lambda` + dev auth, live
+  on the Function URL: an agent can `list`/`read` a corpus over MCP/REST.
+- **M2 — Ingestion & extraction** 🔧 in progress — **write path done & live**
+  (in-request `PUT`→`text_native` extract→`derived/` + catalog row, verified on
+  AWS). Next: the **async pipeline** (EventBridge → SQS → extractor worker so
+  heavy parsers don't block the request) + a real `Docling` rung + the
+  reconciler. *Exit:* a corrupt PDF lands `catalog_only` and is still cite-able;
+  a hand-deleted catalog row heals.
 - **M3 — Grep, scratch, budgets** — two-stage budgeted grep, scratch namespace,
   full MCP middleware (visibility, per-call enforcement, audit). *Exit:* an agent
   greps a 1k-file corpus under budget.
