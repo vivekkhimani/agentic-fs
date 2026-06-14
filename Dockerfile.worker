@@ -23,12 +23,12 @@ COPY pyproject.toml uv.lock ./
 COPY packages/afs-core/pyproject.toml packages/afs-core/README.md ./packages/afs-core/
 COPY packages/afs-server/pyproject.toml packages/afs-server/README.md ./packages/afs-server/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-workspace --package afs-server --extra docling
+    uv sync --frozen --no-dev --no-install-workspace --package afs-server --extra docling --extra textract
 
 # Project layer — install the workspace packages themselves (built wheels).
 COPY packages/ ./packages/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-editable --package afs-server --extra docling
+    uv sync --frozen --no-dev --no-editable --package afs-server --extra docling --extra textract
 
 # ---------------------------------------------------------------------------
 # Runtime — AWS Lambda Python base (Runtime Interface Client + emulator built in).

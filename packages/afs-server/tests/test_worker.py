@@ -93,6 +93,22 @@ async def test_skips_non_original_keys() -> None:
     assert processed == 0
 
 
+async def test_worker_skips_rows_already_extracted_inline() -> None:
+    catalog, objects = _stores()
+    await objects.put(
+        keys.originals_key("dev", "ns", "done.md"), b"hi", content_type="text/markdown"
+    )
+    # serving already extracted this inline → the escalation worker must leave it.
+    await catalog.put_entry(
+        make_entry(
+            "dev", "ns", "done.md", entry_id="E9", extraction=ExtractionState(status="extracted")
+        )
+    )
+    await process_keys(_ingest(catalog, objects), [keys.originals_key("dev", "ns", "done.md")])
+    # no derived page written by the worker — it returned before re-extracting.
+    assert await objects.stat(keys.derived_text_key("dev", "ns", "E9", 1)) is None
+
+
 # --- async-mode ingest ---
 
 
