@@ -8,6 +8,19 @@ members = ["packages/*"]
 [tool.uv]
 package = false
 
+# `torch` (pulled by the optional `docling` extra) defaults to the CUDA build on
+# Linux — ~2-3 GB of nvidia-* libraries that are useless on (GPU-less) Lambda and
+# blow the worker image / CI build past the runner's disk. Pin torch + torchvision
+# to the CPU wheels.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+
 [dependency-groups]
 dev = [
     "pytest>=8",
