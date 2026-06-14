@@ -62,6 +62,7 @@ names, so the image stays as light as your pipeline:
 |---|---|---|
 | `textract` | `[textract]` (Pillow; boto3 is base) | **AWS Textract OCR** — scanned PDFs/images, forms, tables, **handwriting** (managed, no local ML) |
 | `tesseract` | `[tesseract]` (+ the tesseract binary) | lightweight self-hosted OCR — clean printed scans, no data leaves |
+| `rapidocr` | `[rapidocr]` (onnxruntime+opencv) | PaddleOCR-quality OCR on ONNX (no torch) — better self-hosted recognition, still light |
 | `docling` | `[docling]` (heavy ML) | born-digital PDFs with complex layout/tables |
 
 ```bash

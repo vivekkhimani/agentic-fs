@@ -47,6 +47,9 @@ textract = ["pillow>=10"]
 # Tesseract OCR rung (lightweight, self-hosted). Also requires the tesseract
 # system binary at runtime (not a pip dep).
 tesseract = ["pytesseract>=0.3", "pillow>=10"]
+# RapidOCR rung — PaddleOCR-quality OCR on ONNX (no torch). Pulls onnxruntime +
+# opencv + numpy; opencv needs X11/GL system libs at runtime.
+rapidocr = ["rapidocr-onnxruntime>=1.3", "pillow>=10"]
 # Reserved for future backends. Intentionally empty until the dependencies
 # exist — declaring the names now keeps the install surface stable.
 # TODO: add the Postgres catalog backend deps when that store lands.
