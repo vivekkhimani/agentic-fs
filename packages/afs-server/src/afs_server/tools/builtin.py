@@ -155,3 +155,56 @@ class FsGrepTool:
                     max_matches=max_matches,
                 )
             )
+
+
+class ScratchWriteTool:
+    name = "scratch_write"
+    required_scopes = frozenset({"fs:write:scratch"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def scratch_write(path: str, content: str) -> dict[str, Any]:
+            """Write text to your private scratch workspace (overwrites `path`).
+
+            Scratch is your own working area — for notes/intermediate results — not
+            the shared corpus, so it never appears in fs_list/fs_grep. Subject to
+            your scratch quota; returns your usage after the write.
+            """
+            return await _result(deps.scratch.write(deps.resolve(), path, content))
+
+
+class ScratchReadTool:
+    name = "scratch_read"
+    required_scopes = frozenset({"fs:write:scratch"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def scratch_read(path: str) -> dict[str, Any]:
+            """Read back text you wrote to your scratch workspace."""
+            return await _result(deps.scratch.read(deps.resolve(), path))
+
+
+class ScratchListTool:
+    name = "scratch_list"
+    required_scopes = frozenset({"fs:write:scratch"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def scratch_list(prefix: str = "") -> dict[str, Any]:
+            """List paths in your scratch workspace under an optional prefix."""
+            return await _result(deps.scratch.list(deps.resolve(), prefix))
+
+
+class ScratchDeleteTool:
+    name = "scratch_delete"
+    required_scopes = frozenset({"fs:write:scratch"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def scratch_delete(path: str) -> dict[str, Any]:
+            """Delete a scratch object and free its quota."""
+            return await _result(deps.scratch.delete(deps.resolve(), path))

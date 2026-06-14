@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from fastmcp import FastMCP
 
     from afs_server.auth import TenantContext
-    from afs_server.services import FsService
+    from afs_server.services import FsService, ScratchService
     from afs_server.settings import Settings
 
 
@@ -30,6 +30,7 @@ class ToolDeps:
     """What a tool needs to do its job: the shared services + the principal."""
 
     fs: FsService
+    scratch: ScratchService
     settings: Settings
 
     def resolve(self) -> TenantContext:

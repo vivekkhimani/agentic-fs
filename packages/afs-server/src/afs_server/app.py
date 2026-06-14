@@ -20,7 +20,7 @@ from afs_server.extraction import build_from_settings
 from afs_server.logging_config import configure_logging
 from afs_server.mcp import build_mcp
 from afs_server.routers import connectors, fs, ingest, meta
-from afs_server.services import FsService
+from afs_server.services import FsService, ScratchService
 from afs_server.settings import load_settings
 from afs_server.stores import get_catalog_store, get_object_store
 
@@ -43,9 +43,10 @@ def create_app() -> FastAPI:
     catalog = get_catalog_store(settings)
     objects = get_object_store(settings)
     fs_service = FsService(catalog, objects)
+    scratch_service = ScratchService(catalog, objects)
     extraction_pipeline = build_from_settings(settings)
 
-    mcp_app = build_mcp(fs_service, settings).http_app(path="/")
+    mcp_app = build_mcp(fs_service, settings, scratch_service).http_app(path="/")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

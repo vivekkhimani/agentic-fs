@@ -17,6 +17,10 @@ from afs_server.tools.builtin import (
     FsListTool,
     FsReadTool,
     FsStatTool,
+    ScratchDeleteTool,
+    ScratchListTool,
+    ScratchReadTool,
+    ScratchWriteTool,
     WhoamiTool,
 )
 
@@ -25,7 +29,18 @@ _TOOL_ENTRY_GROUP = "afs.tools"
 # Builtin tools: name -> factory (zero-arg). Always available.
 _BUILTIN_TOOLS: dict[str, type[Tool]] = {
     cls.name: cls
-    for cls in (WhoamiTool, FsListTool, FsStatTool, FsReadTool, FsGlobTool, FsGrepTool)
+    for cls in (
+        WhoamiTool,
+        FsListTool,
+        FsStatTool,
+        FsReadTool,
+        FsGlobTool,
+        FsGrepTool,
+        ScratchWriteTool,
+        ScratchReadTool,
+        ScratchListTool,
+        ScratchDeleteTool,
+    )
 }
 
 
