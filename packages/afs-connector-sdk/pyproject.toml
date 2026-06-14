@@ -1,0 +1,49 @@
+[project]
+name = "afs-connector-sdk"
+version = "0.1.0"
+description = "agentic-fs connector SDK: crawl a source and ingest into agentic-fs. Ships the fs-crawler CLI plus Local FS and S3 connectors."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+authors = [{ name = "Vivek Khimani", email = "vivekkhimani07@gmail.com" }]
+keywords = [
+    "agentic-fs",
+    "agents",
+    "connector",
+    "ingestion",
+    "s3",
+    "etl",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+dependencies = [
+    "afs-core",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+# The S3 connector (boto3) and SigV4 signing for AWS_IAM Function URLs. The Local
+# FS connector and unauthenticated/bearer endpoints need none of this.
+aws = ["boto3>=1.34"]
+
+[project.scripts]
+fs-crawler = "afs_connector_sdk.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/vivekkhimani/agentic-fs"
+Repository = "https://github.com/vivekkhimani/agentic-fs"
+Issues = "https://github.com/vivekkhimani/agentic-fs/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/afs_connector_sdk"]
+
+[tool.uv.sources]
+afs-core = { workspace = true }

@@ -51,8 +51,9 @@ CI gates every PR: **Python** (ruff + pytest) for `packages/**`, **Terraform**
 
 ```
 packages/
-  afs-core/      contracts (Protocols), DTOs, key scheme, conformance kits   (pydantic only)
-  afs-server/    stores, services, the FastAPI app                            (implements afs-core)
+  afs-core/           contracts (Protocols), DTOs, key scheme, conformance kits   (pydantic only)
+  afs-server/         stores, services, the FastAPI app                            (implements afs-core)
+  afs-connector-sdk/  fs-crawler CLI + sync engine + Local FS / S3 connectors      (client-side)
 terraform/       modular IaC — global state/CI roles, per-layer modules, examples
 docs/            the plan, build progress, swap guides, decision records (ADRs)
 Dockerfile       one image: Lambda + Fargate + local
@@ -68,6 +69,8 @@ one-page guide — run it on the infrastructure you already have:
 | Object store | S3 · MinIO · **Cloudflare R2** · Wasabi · B2 (often just an endpoint) | [object-store](docs/swap-guides/object-store.md) |
 | Catalog | DynamoDB · Postgres (BYO-RDS) | [catalog](docs/swap-guides/catalog.md) |
 | Compute | Lambda · Fargate · Cloudflare Worker (edge) | [compute](docs/swap-guides/compute.md) |
+| Extraction | text-native · **Docling** (PDF/Office/OCR) · your parser | [extraction](docs/swap-guides/extraction.md) |
+| Connectors | Local FS · S3 · Google Drive / SharePoint (BYO) | [connectors](docs/swap-guides/connectors.md) |
 
 How it works: a backend name in settings + entry-point discovery
 ([ADR 0002](docs/decisions/0002-pluggable-backends-via-entry-points.md)).
@@ -81,8 +84,9 @@ Install only the parts you need — the contracts are usable without the server.
 | `afs-core` | contracts (Protocols), DTOs, key scheme, errors — **pydantic only** | building a custom store/connector against the contracts |
 | `afs-core[testing]` | the above **+ conformance kits + in-memory fakes** (adds pytest) | certifying your implementation against the kits |
 | `afs-server` | the service: stores (S3/DynamoDB), `FsService`, FastAPI app, MCP mount | running agentic-fs |
+| `afs-connector-sdk` | the `fs-crawler` CLI + sync engine + Local FS / S3 connectors | crawling your documents into agentic-fs (add `[aws]` for S3 + SigV4) |
 
-Distributions `afs-core` / `afs-server` import as `afs_core` / `afs_server`. Both
+Distributions import as `afs_core` / `afs_server` / `afs_connector_sdk`. All
 are PEP 561 typed. Packaging conventions, the namespace decision, and the
 release/versioning flow are in
 [ADR 0005](docs/decisions/0005-packaging-and-pypi-distribution.md);

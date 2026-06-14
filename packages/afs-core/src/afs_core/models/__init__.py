@@ -1,5 +1,6 @@
 """Core DTOs and control records (pydantic v2)."""
 
+from afs_core.models.connector import SourceItem
 from afs_core.models.control import (
     NamespaceRecord,
     PrincipalRecord,
@@ -37,6 +38,7 @@ __all__ = [
     "QualityReport",
     "ScratchUsage",
     "SourceDocument",
+    "SourceItem",
     "SourceRef",
     "SyncCheckpoint",
     "TenantRecord",

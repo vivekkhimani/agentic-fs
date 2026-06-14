@@ -37,10 +37,11 @@ document to the Function URL → it lands in S3 (SSE-KMS), is extracted
 
 ### Application track (deployed — API + ingestion live on AWS)
 
-| Package | What's in it | Tests |
-|---|---|---|
-| `afs-core` | the contracts (`ObjectStore`/`CatalogStore` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** | 50 |
-| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + `ExtractionPipeline` write path** (`Normalizer` contract, `text_native` rung, [ADR 0006](decisions/0006-extraction-normalizer-contract.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read` over the same `FsService`, in-process) | +41 |
+| Package | What's in it |
+|---|---|
+| `afs-core` | the **contracts** (`ObjectStore` · `CatalogStore` · `Normalizer` · `Connector` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** for each |
+| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + `ExtractionPipeline` write path** (`text_native` + optional `docling` rungs, [ADR 0006](decisions/0006-extraction-normalizer-contract.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read`, in-process) |
+| `afs-connector-sdk` | the **`fs-crawler` CLI** + `SyncEngine` (discover → checksum-skip → ingest → prune) + `IngestClient` (SigV4 / no-auth) + **Local FS** and **S3** connectors ([ADR 0007](decisions/0007-connector-model.md)) — verified end-to-end against the live Function URL |
 
 The API is **containerized** ([`Dockerfile`](../Dockerfile), [ADR 0003](decisions/0003-container-image.md)):
 one multi-stage, non-root, ~190 MB image runs uvicorn on **Lambda (Web Adapter) +
@@ -71,7 +72,8 @@ Status against each:
 | Encryption / tenancy floor | `kms` | ✅ done | **Multi-tenant, enterprise-secure by default** — SSE-KMS on every object |
 | Catalog (list/glob/stat index) | `catalog_dynamodb` (default) / `catalog_postgres` | ✅ done | The **derived index** of S3 — navigation without O(corpus) S3 LISTs; healable; **swappable** |
 | Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | ✅ done (live) | **MCP-first, agent-shaped** — streaming Function URL (AWS_IAM); OAuth resource server + enforcement boundary still to come |
-| Ingest → extract → heal | `ingestion` | 🔧 write path done (live) | **In-request** `PUT`→extract→catalog works end-to-end; the **async S3-event pipeline** (EventBridge → SQS → worker) + reconciler are the next slice |
+| Ingest → extract → heal | `ingestion` | 🔧 write path done (live) | **In-request** `PUT`→extract→catalog works end-to-end (`text_native` + `docling` rungs); the **async S3-event pipeline** (EventBridge → SQS → worker) + reconciler are the next slice |
+| Connectors (source → ingest) | `afs-connector-sdk` | 🔧 local + S3 done | **Point it at your documents** — client-side crawlers push to the ingest API; Google Drive / SharePoint are the next (OAuth) connectors ([ADR 0007](decisions/0007-connector-model.md)) |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
 | OAuth IdP (optional) | `auth_cognito` | M1/opt | OAuth 2.1 resource server, batteries-included, $0 under free tier |
 | Malware gate, audit, alarms | `security_guardduty`, `observability` | opt | Enterprise hardening — none of it bolted on later |
@@ -87,12 +89,14 @@ it — so the system is demoable at every step (plan §15).
 - **M0 — Foundation** ✅ — `kms` + `storage`. S3-is-canonical is now real.
 - **M1 — Read path** ✅ — `catalog_dynamodb` + `compute_lambda` + dev auth, live
   on the Function URL: an agent can `list`/`read` a corpus over MCP/REST.
-- **M2 — Ingestion & extraction** 🔧 in progress — **write path done & live**
-  (in-request `PUT`→`text_native` extract→`derived/` + catalog row, verified on
-  AWS). Next: the **async pipeline** (EventBridge → SQS → extractor worker so
-  heavy parsers don't block the request) + a real `Docling` rung + the
-  reconciler. *Exit:* a corrupt PDF lands `catalog_only` and is still cite-able;
-  a hand-deleted catalog row heals.
+- **M2 — Ingestion & extraction** 🔧 in progress — **write path live**
+  (in-request `PUT`→extract→`derived/` + catalog row, verified on AWS); the
+  **`docling` rung** (PDF/Office/images) and the **connector SDK** (`fs-crawler`,
+  Local FS + S3, certified live) have landed. Next: the **async pipeline**
+  (EventBridge → SQS → extractor worker so heavy parsers don't block the request,
+  and where `docling` runs in production), the **Google Drive / SharePoint**
+  connectors (OAuth), and the reconciler. *Exit:* a corrupt PDF lands
+  `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
 - **M3 — Grep, scratch, budgets** — two-stage budgeted grep, scratch namespace,
   full MCP middleware (visibility, per-call enforcement, audit). *Exit:* an agent
   greps a 1k-file corpus under budget.
