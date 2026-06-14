@@ -397,9 +397,10 @@ resource "aws_iam_policy" "ci_boundary" {
 # repo + function — far narrower than the apply role. Same gated `sandbox` trust.
 # ===========================================================================
 locals {
-  ecr_api_repo_arn    = "arn:aws:ecr:${var.aws_region}:${local.account_id}:repository/agentic-fs-api"
-  api_function_arn    = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:agentic-fs-api"
-  worker_function_arn = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:agentic-fs-worker"
+  ecr_api_repo_arn        = "arn:aws:ecr:${var.aws_region}:${local.account_id}:repository/agentic-fs-api"
+  api_function_arn        = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:agentic-fs-api"
+  worker_function_arn     = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:agentic-fs-worker"
+  reconciler_function_arn = "arn:aws:lambda:${var.aws_region}:${local.account_id}:function:agentic-fs-reconciler"
 }
 
 data "aws_iam_policy_document" "image_push" {
@@ -429,7 +430,7 @@ data "aws_iam_policy_document" "image_push" {
     sid       = "RollLambda"
     effect    = "Allow"
     actions   = ["lambda:GetFunction", "lambda:UpdateFunctionCode"]
-    resources = [local.api_function_arn, local.worker_function_arn]
+    resources = [local.api_function_arn, local.worker_function_arn, local.reconciler_function_arn]
   }
 }
 

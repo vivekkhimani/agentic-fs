@@ -81,6 +81,7 @@ jobs:
     environment: sandbox
     env:
       WORKER_NAME: agentic-fs-worker
+      RECONCILER_NAME: agentic-fs-reconciler
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -121,5 +122,23 @@ jobs:
             echo "Lambda $WORKER_NAME not created yet — image pushed only (create via the ingestion module)."
           else
             echo "::error::Cannot roll $WORKER_NAME — get-function failed: $err"
+            exit 1
+          fi
+
+      - name: Roll the reconciler Lambda to the new image (if it exists)
+        env:
+          IMAGE: ${{ steps.build.outputs.image }}
+        run: |
+          set -euo pipefail
+          # The reconciler runs the same worker image (different handler), so it
+          # rolls to the same tag. Same loud-on-error contract as the worker.
+          if err=$(aws lambda get-function --function-name "$RECONCILER_NAME" 2>&1 >/dev/null); then
+            aws lambda update-function-code \
+              --function-name "$RECONCILER_NAME" --image-uri "$IMAGE" --publish >/dev/null
+            echo "Rolled $RECONCILER_NAME to $IMAGE"
+          elif printf '%s' "$err" | grep -q 'ResourceNotFoundException'; then
+            echo "Lambda $RECONCILER_NAME not created yet — image pushed only (create via the ingestion module)."
+          else
+            echo "::error::Cannot roll $RECONCILER_NAME — get-function failed: $err"
             exit 1
           fi

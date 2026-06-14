@@ -22,3 +22,13 @@ output "worker_function_arn" {
   description = "ARN of the extractor worker Lambda."
   value       = aws_lambda_function.worker.arn
 }
+
+output "reconciler_function_name" {
+  description = "Name of the reconciler Lambda."
+  value       = aws_lambda_function.reconciler.function_name
+}
+
+output "reconciler_function_arn" {
+  description = "ARN of the reconciler Lambda."
+  value       = aws_lambda_function.reconciler.arn
+}

@@ -210,3 +210,120 @@ resource "aws_lambda_event_source_mapping" "worker" {
   function_name    = aws_lambda_function.worker.arn
   batch_size       = var.batch_size
 }
+
+# ---------------------------------------------------------------------------
+# Reconciler — scheduled sweep that heals catalog drift from S3 ("rebuildable
+# from S3"). Reuses the worker image with the reconcile handler. It only *detects*
+# drift: it enqueues missing/stale/re-added objects onto the extract queue (the
+# worker extracts) and soft-deletes orphaned rows. No S3 object reads → no CMK.
+# ---------------------------------------------------------------------------
+locals {
+  reconciler_name = "${var.name_prefix}-reconciler"
+}
+
+resource "aws_iam_role" "reconciler" {
+  name                 = "${local.reconciler_name}-exec"
+  assume_role_policy   = data.aws_iam_policy_document.assume.json
+  permissions_boundary = var.permissions_boundary_arn
+}
+
+resource "aws_cloudwatch_log_group" "reconciler" {
+  name              = "/aws/lambda/${local.reconciler_name}"
+  retention_in_days = var.log_retention_days
+}
+
+data "aws_iam_policy_document" "reconciler" {
+  statement {
+    sid       = "Logs"
+    effect    = "Allow"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.reconciler.arn}:*"]
+  }
+  # List originals to diff against the catalog (no GetObject → no decrypt/CMK).
+  statement {
+    sid       = "ListOriginals"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [var.data_bucket_arn]
+  }
+  # Scan rows + soft-delete (tombstone = PutItem) orphans.
+  statement {
+    sid    = "Catalog"
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:Query",
+      "dynamodb:Scan",
+      "dynamodb:DescribeTable",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+    ]
+    resources = [var.catalog_table_arn, "${var.catalog_table_arn}/index/*"]
+  }
+  # Enqueue drift for the worker to (re)extract.
+  statement {
+    sid       = "EnqueueExtract"
+    effect    = "Allow"
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.extract.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "reconciler" {
+  name   = "agentic-fs-reconciler"
+  role   = aws_iam_role.reconciler.id
+  policy = data.aws_iam_policy_document.reconciler.json
+}
+
+resource "aws_lambda_function" "reconciler" {
+  function_name = local.reconciler_name
+  role          = aws_iam_role.reconciler.arn
+  package_type  = "Image"
+  image_uri     = var.image_uri # the worker image …
+  image_config {
+    command = ["afs_server.reconcile.handler"] # … with the reconcile handler
+  }
+  architectures = ["x86_64"]
+  memory_size   = var.reconciler_memory_mb
+  timeout       = var.reconciler_timeout_seconds
+
+  environment {
+    variables = {
+      AFS_REGION                  = var.region
+      AFS_OBJECT_STORE_BACKEND    = "s3"
+      AFS_DATA_BUCKET             = var.data_bucket_name
+      AFS_CATALOG_BACKEND         = "dynamodb"
+      AFS_CATALOG_TABLE           = var.catalog_table_name
+      AFS_EXTRACT_QUEUE_URL       = aws_sqs_queue.extract.url
+      AFS_RECONCILE_GRACE_SECONDS = tostring(var.reconcile_grace_seconds)
+      AFS_LOG_LEVEL               = var.log_level
+    }
+  }
+
+  depends_on = [aws_iam_role_policy.reconciler, aws_cloudwatch_log_group.reconciler]
+
+  # CD rolls the image (image.yml); Terraform sets the bootstrap and ignores drift.
+  lifecycle {
+    ignore_changes = [image_uri]
+  }
+}
+
+# --- schedule: invoke the reconciler on a rate ---
+resource "aws_cloudwatch_event_rule" "reconcile_schedule" {
+  name                = "${var.name_prefix}-reconcile"
+  description         = "Periodic catalog↔S3 reconciliation sweep"
+  schedule_expression = var.reconcile_schedule
+}
+
+resource "aws_cloudwatch_event_target" "reconcile" {
+  rule = aws_cloudwatch_event_rule.reconcile_schedule.name
+  arn  = aws_lambda_function.reconciler.arn
+}
+
+resource "aws_lambda_permission" "reconcile_schedule" {
+  statement_id  = "AllowEventBridgeInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.reconciler.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.reconcile_schedule.arn
+}

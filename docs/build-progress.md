@@ -72,7 +72,7 @@ Status against each:
 | Encryption / tenancy floor | `kms` | ✅ done | **Multi-tenant, enterprise-secure by default** — SSE-KMS on every object |
 | Catalog (list/glob/stat index) | `catalog_dynamodb` (default) / `catalog_postgres` | ✅ done | The **derived index** of S3 — navigation without O(corpus) S3 LISTs; healable; **swappable** |
 | Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | ✅ done (live) | **MCP-first, agent-shaped** — streaming Function URL (AWS_IAM); OAuth resource server + enforcement boundary still to come |
-| Ingest → extract → heal | `ingestion` ✅ | **Hybrid extraction** (ADR 0009): serving extracts common files **inline** (light `text_native,pdf,docx` ladder, instant) while the **S3-event worker** OCR-escalates the rest — EventBridge → SQS (+DLQ) → worker Lambda. The worker image is **parametric** (`Dockerfile.worker`, `AFS_EXTRAS` build arg): the slim default runs `text_native,pdf,docx,textract` (~700 MB, managed OCR, no torch); `docling` is an opt-in heavy build. A rung named without its extra declines safely. Skips rows already extracted inline. **Structured logging** (structlog → JSON in CloudWatch, console in dev; `AFS_LOG_LEVEL`) surfaces declines/escalation/per-doc progress; the **DLQ** is locked to the extract queue with a redrive-allow policy (move-back after a fix). CloudWatch **alarms** + a scheduled **reconciler** (S3↔catalog heal) are the remaining pieces |
+| Ingest → extract → heal | `ingestion` ✅ | **Hybrid extraction** (ADR 0009): serving extracts common files **inline** (light `text_native,pdf,docx` ladder, instant) while the **S3-event worker** OCR-escalates the rest — EventBridge → SQS (+DLQ) → worker Lambda. The worker image is **parametric** (`Dockerfile.worker`, `AFS_EXTRAS` build arg): the slim default runs `text_native,pdf,docx,textract` (~700 MB, managed OCR, no torch); `docling` is an opt-in heavy build. A rung named without its extra declines safely. Skips rows already extracted inline. **Structured logging** (structlog → JSON in CloudWatch, console in dev; `AFS_LOG_LEVEL`) surfaces declines/escalation/per-doc progress; the **DLQ** is locked to the extract queue with a redrive-allow policy (move-back after a fix). The scheduled **reconciler** ([ADR 0011](decisions/0011-reconciliation.md), EventBridge rate → Lambda) heals catalog↔S3 drift: missing/stale/re-added objects are enqueued for the worker, orphaned rows are **soft-deleted** (tombstones revive if the file returns) ✅. CloudWatch **alarms** are the remaining piece |
 | Connectors (source → ingest) | `afs-connector-sdk` | 🔧 local + S3 + Drive | **Point it at your documents** — client-side crawlers push to the ingest API, with **incremental sync** (version-skip + delta cursors, [ADR 0008](decisions/0008-incremental-sync.md)) so big sources aren't re-crawled wholesale. Local FS / S3 / **Google Drive** (OAuth + export) ship; Drive's delta `changes.list` + SharePoint are next |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
 | OAuth IdP (optional) | `auth_cognito` | M1/opt | OAuth 2.1 resource server, batteries-included, $0 under free tier |
@@ -98,8 +98,9 @@ it — so the system is demoable at every step (plan §15).
   worker** + two-mode ingest + the **`ingestion` Terraform module** (EventBridge →
   SQS → `docling` worker Lambda, [ADR 0009](decisions/0009-async-extraction-pipeline.md))
   have landed (async path **live-validated**: a scanned PDF degrades to
-  `catalog_only` inline and the worker escalates it via Textract OCR). Next: the
-  **reconciler**, and the **extraction-routing** upgrade — a Haystack pipeline
+  `catalog_only` inline and the worker escalates it via Textract OCR). The
+  scheduled **reconciler** now heals catalog↔S3 drift (soft-delete orphans;
+  re-added files revive) ✅. The **extraction-routing** upgrade — a Haystack pipeline
   engine with structure-preserving + multimodal rungs (`textract_analyze` ✅, `llm` ✅),
   cascade/content-type/optional-LLM routing ([ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)).
   The quality gate now escalates on **confidence** (`AFS_MIN_CONFIDENCE`) as well as
@@ -114,8 +115,9 @@ it — so the system is demoable at every step (plan §15).
   **Content-type routing** (`AFS_PIPELINE_FILE` → per-MIME ladders in YAML) sends
   images to vision, PDFs to table-structure rungs, etc. ✅ — this is what the
   Haystack engine unlocks over the linear ladder. Then Drive's delta
-  `changes.list` (L2) + SharePoint. *Exit:* a corrupt PDF lands
-  `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
+  `changes.list` (L2) + SharePoint. *Exit (met):* a corrupt PDF lands
+  `catalog_only` and is still cite-able; a hand-deleted catalog row heals on the
+  next reconciler sweep.
   - **Backlog (post-engine):** ship a set of **pre-packaged Haystack pipeline
     presets** users pick from instead of wiring components themselves — e.g.
     `cheap-text` (lightweight only), `scanned-docs` (OCR escalation),

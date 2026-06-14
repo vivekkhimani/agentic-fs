@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     # shaky Textract OCR on to a stronger rung (llm).
     extraction_min_confidence: float = 0.0
 
+    # --- reconciler (heal catalog drift from S3) ---
+    # The extract SQS queue the reconciler enqueues drift onto (the worker drains it).
+    extract_queue_url: str | None = None
+    # Don't tombstone an orphaned row updated within this window — race guard.
+    reconcile_grace_seconds: int = 900
+
     @property
     def extraction_ladder_names(self) -> list[str]:
         if self.extraction_ladder.strip():
