@@ -55,14 +55,24 @@ they can't (scans, complex tables/layout).
 layer), `docx` (python-docx). Common files extract **synchronously, in-request** —
 the default ladder is `text_native,pdf,docx`.
 
-**`docling`** (PDF/Office/images, OCR) is a heavier **optional extra**, for the
-quality cases — put it on the async extractor worker, not the request path:
+**OCR / heavier rungs are optional extras** — install only what your ladder
+names, so the image stays as light as your pipeline:
+
+| Rung | Extra | For |
+|---|---|---|
+| `textract` | `[textract]` (Pillow; boto3 is base) | **AWS Textract OCR** — scanned PDFs/images, forms, tables, **handwriting** (managed, no local ML) |
+| `docling` | `[docling]` (heavy ML) | born-digital PDFs with complex layout/tables |
 
 ```bash
-pip install "afs-server[docling]"
-# worker: try the light rungs first, escalate to docling where they fall short
-export AFS_EXTRACTION_LADDER="text_native,pdf,docx,docling"
+pip install "afs-server[textract]"
+# worker: light rungs first, then OCR/escalation for what they leave empty
+export AFS_EXTRACTION_LADDER="text_native,pdf,docx,textract"
 ```
+
+`textract` rasterizes PDF pages (pypdfium2) and OCRs each, or takes images
+directly. More OCR engines (Tesseract, RapidOCR, PaddleOCR) follow the same
+pattern; pick permissively-licensed ones — avoid AGPL (PyMuPDF) and
+commercial-restricted (Surya/Marker) for bundled extras.
 
 Reference: `afs_server.extraction`, contract in `afs_core/contracts/normalize.py`,
 decisions in [`0006`](../decisions/0006-extraction-normalizer-contract.md)

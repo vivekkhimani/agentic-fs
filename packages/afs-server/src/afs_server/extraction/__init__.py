@@ -18,6 +18,7 @@ from afs_server.extraction.pdf import PdfNormalizer
 from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline
 from afs_server.extraction.runner import run_extraction
 from afs_server.extraction.text_native import TextNativeNormalizer
+from afs_server.extraction.textract import TextractNormalizer
 
 _NORMALIZER_ENTRY_GROUP = "afs.normalizers"
 
@@ -28,6 +29,7 @@ _BUILTIN_NORMALIZERS = {
     "text_native": TextNativeNormalizer,
     "pdf": PdfNormalizer,
     "docx": DocxNormalizer,
+    "textract": TextractNormalizer,
     "docling": DoclingNormalizer,
 }
 
