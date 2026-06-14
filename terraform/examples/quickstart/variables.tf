@@ -38,9 +38,10 @@ variable "image_tag" {
     and Terraform ignores image drift, so this only matters on a fresh create.
   EOT
   type        = string
-  # Bumped to a SHA where both the serving (:<sha>) and worker (:worker-<sha>)
-  # images exist, so the worker Lambda can be created. Serving ignores image drift.
-  default = "fb4eb7015d1e"
+  # A SHA where both the serving (:<sha>) and worker (:worker-<sha>) images exist
+  # — b0bd416 is the #26 (CPU-torch) merge, the first successful worker build.
+  # Only used to CREATE the Lambdas; CD rolls them after, and drift is ignored.
+  default = "b0bd416c42e9"
 }
 
 variable "enable_ingestion" {
