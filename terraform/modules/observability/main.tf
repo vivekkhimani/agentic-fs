@@ -9,18 +9,13 @@
 # throttles, and sustained catalog throttling.
 # ---------------------------------------------------------------------------
 
-# The alerts topic carries operational alarm metadata (names, states, reasons,
-# resource names) — never tenant/document data, which is CMK-encrypted at its
-# source. SSE here is deliberately deferred: the project CMK is root-only by
-# design (authority delegated via IAM), so encrypting this topic with it would
-# silently break CloudWatch -> SNS delivery (the cloudwatch service principal
-# isn't granted on the key), and the AWS-managed SNS key has the same problem.
-# CMK encryption with an explicit CloudWatch key grant is a future hardening
-# toggle (best validated against the live account). Scoped exception, parallel to
-# the remote-state bucket's SSE-S3 exception in global/bootstrap.
-#trivy:ignore:AWS-0095
+# SSE-KMS with the project CMK. Delivery works because the CMK key policy grants
+# the CloudWatch service principal kms:Decrypt + GenerateDataKey* (see the kms
+# module) — without that grant an encrypted topic would accept alarms but fail to
+# deliver. The topic still only ever carries alarm metadata, not tenant data.
 resource "aws_sns_topic" "alerts" {
-  name = "${var.name_prefix}-alerts"
+  name              = "${var.name_prefix}-alerts"
+  kms_master_key_id = var.kms_key_arn
 }
 
 resource "aws_sns_topic_subscription" "email" {

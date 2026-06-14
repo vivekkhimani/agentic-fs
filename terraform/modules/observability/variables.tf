@@ -3,6 +3,11 @@ variable "name_prefix" {
   type        = string
 }
 
+variable "kms_key_arn" {
+  description = "Project CMK ARN — SSE-KMS for the alerts topic. Its key policy must grant the CloudWatch service principal (the kms module does this) or alarm notifications won't deliver."
+  type        = string
+}
+
 variable "alarm_email" {
   description = "Optional email subscribed to the alerts topic (confirm via the AWS email). When null, the topic is created with no subscription — wire your own (Slack/PagerDuty/chatbot) to its ARN."
   type        = string

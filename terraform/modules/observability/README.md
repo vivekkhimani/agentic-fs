@@ -43,11 +43,12 @@ The CI apply role permits CloudWatch + SNS within the project's region/scope via
 its allow-ceiling + deny-guardrails, so no `ci-roles` change is needed. Explicit
 log-group retention and an optional dashboard / AWS Budgets are future toggles.
 
-**SNS encryption** is a deliberate, scoped exception (`#trivy:ignore:AWS-0095`):
-the topic carries alarm *metadata*, not tenant data; and CMK-encrypting it against
-the root-only project CMK would break CloudWatch→SNS delivery (the key doesn't
-grant the CloudWatch service principal). CMK encryption with an explicit
-CloudWatch key grant is a future hardening toggle, best validated live.
+**SNS encryption:** the alerts topic is **SSE-KMS** with the project CMK
+(`kms_key_arn`). Delivery works because the CMK key policy grants the CloudWatch
+service principal `kms:Decrypt` + `kms:GenerateDataKey*` (added in the `kms`
+module, scoped to the account) — the cross-service publisher is the one principal
+that can't be granted via IAM, so it lives in the key policy. Reuses the one
+shared CMK, so no extra key cost.
 
 Conventions: HashiCorp style-guide layout (`terraform.tf`/`main.tf`/`variables.tf`/`outputs.tf`),
 typed + documented variables, `<name_prefix>-<component>` naming, no

@@ -93,6 +93,7 @@ module "observability" {
   count  = var.enable_observability ? 1 : 0
 
   name_prefix              = var.name_prefix
+  kms_key_arn              = module.kms.key_arn
   alarm_email              = var.alarm_email
   api_function_name        = var.enable_compute ? module.compute[0].function_name : null
   worker_function_name     = var.enable_ingestion ? module.ingestion[0].worker_function_name : null
