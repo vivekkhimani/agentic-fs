@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from afs_core.contracts import NormalizationError
 
 if TYPE_CHECKING:
     from afs_core.contracts import Normalizer
-    from afs_core.models import NormalizedDocument, SourceDocument
+    from afs_core.models import NormalizedDocument, QualityReport, SourceDocument
 
 logger = logging.getLogger("afs_server.extraction")
 
@@ -25,6 +25,21 @@ logger = logging.getLogger("afs_server.extraction")
 class ExtractionOutcome:
     document: NormalizedDocument
     extractor: str  # which rung produced it (recorded on the catalog row)
+
+
+class ExtractionRunner(Protocol):
+    """What ``build_pipeline`` returns — the ladder or the Haystack engine. Both
+    walk rungs and return the winning outcome (or ``None`` ⇒ catalog_only)."""
+
+    async def run(self, doc: SourceDocument) -> ExtractionOutcome | None: ...
+
+
+def passes_gate(quality: QualityReport, min_chars: int, min_confidence: float) -> bool:
+    """The shared quality gate (used by both pipeline engines): enough text, and —
+    when a rung reports it — confidence at or above the threshold."""
+    if quality.min_chars_per_page < min_chars:
+        return False
+    return quality.confidence is None or quality.confidence >= min_confidence
 
 
 class ExtractionPipeline:
@@ -51,7 +66,7 @@ class ExtractionPipeline:
             except NormalizationError as err:
                 logger.info("normalizer %s declined %s: %s", nz.name, doc.filename, err.reason)
                 continue
-            if result.pages and self._passes_gate(result):
+            if result.pages and passes_gate(result.quality, self._min_chars, self._min_confidence):
                 return ExtractionOutcome(document=result, extractor=nz.name)
             # below the quality gate — fall through to the next (escalation) rung.
             logger.info(
@@ -62,11 +77,3 @@ class ExtractionPipeline:
                 result.quality.confidence,
             )
         return None
-
-    def _passes_gate(self, result: NormalizedDocument) -> bool:
-        quality = result.quality
-        if quality.min_chars_per_page < self._min_chars:
-            return False
-        # Escalate a low-confidence result (e.g. shaky OCR) to the next rung. A
-        # rung that doesn't report confidence (None) is never gated on it.
-        return quality.confidence is None or quality.confidence >= self._min_confidence

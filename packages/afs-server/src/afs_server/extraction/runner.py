@@ -17,12 +17,12 @@ from afs_core.models import ExtractionState, SourceDocument
 
 if TYPE_CHECKING:
     from afs_core.contracts import ObjectStore
-    from afs_server.extraction.pipeline import ExtractionPipeline
+    from afs_server.extraction.pipeline import ExtractionRunner
 
 
 async def run_extraction(
     objects: ObjectStore,
-    pipeline: ExtractionPipeline,
+    pipeline: ExtractionRunner,
     *,
     tenant_id: str,
     namespace: str,

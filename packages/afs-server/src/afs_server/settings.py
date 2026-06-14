@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # afs-server[docling]).
     extraction_ladder: str = "text_native,pdf,docx"
 
+    # Extraction pipeline engine: "ladder" (built-in linear cascade, default) or
+    # "haystack" (configurable graph engine, ADR 0010 — needs the [haystack] extra).
+    pipeline_engine: str = "ladder"
     # Escalate a result whose reported confidence (0..1, e.g. OCR) is below this to
     # the next ladder rung. 0.0 (default) never gates on confidence; e.g. 0.6 sends
     # shaky Textract OCR on to a stronger rung (llm).

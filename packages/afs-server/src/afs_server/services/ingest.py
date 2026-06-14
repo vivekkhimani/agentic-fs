@@ -24,7 +24,7 @@ from afs_server.extraction import run_extraction
 if TYPE_CHECKING:
     from afs_core.contracts import CatalogStore, ObjectStore
     from afs_server.auth import TenantContext
-    from afs_server.extraction import ExtractionPipeline
+    from afs_server.extraction import ExtractionRunner
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -52,7 +52,7 @@ class IngestService:
         self,
         catalog: CatalogStore,
         objects: ObjectStore,
-        pipeline: ExtractionPipeline,
+        pipeline: ExtractionRunner,
         *,
         extraction_mode: str = "inline",
     ) -> None:
