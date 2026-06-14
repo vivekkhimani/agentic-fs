@@ -70,7 +70,7 @@ one-page guide — run it on the infrastructure you already have:
 | Catalog | DynamoDB · Postgres (BYO-RDS) | [catalog](docs/swap-guides/catalog.md) |
 | Compute | Lambda · Fargate · Cloudflare Worker (edge) | [compute](docs/swap-guides/compute.md) |
 | Extraction | text-native · **Docling** (PDF/Office/OCR) · your parser | [extraction](docs/swap-guides/extraction.md) |
-| Connectors | Local FS · S3 · Google Drive / SharePoint (BYO) | [connectors](docs/swap-guides/connectors.md) |
+| Connectors | Local FS · S3 · **Google Drive** · SharePoint (BYO) | [connectors](docs/swap-guides/connectors.md) |
 
 How it works: a backend name in settings + entry-point discovery
 ([ADR 0002](docs/decisions/0002-pluggable-backends-via-entry-points.md)).
