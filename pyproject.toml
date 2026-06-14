@@ -28,6 +28,9 @@ dev = [
     "ruff>=0.8",
     "moto[s3]>=5",
     "httpx>=0.27",
+    # Lets the test suite exercise the textract rung's PDF-render path (it's the
+    # `[textract]` extra in production).
+    "pillow>=10",
     # Pinned below 49 so a prebuilt macOS wheel is used in local dev (49.0.0's
     # wheel tags require a newer base than our toolchain resolves to). CI on
     # Linux is unaffected. moto only needs cryptography for request signing.
