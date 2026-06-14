@@ -1,10 +1,15 @@
 name: Release
 
-# Publishes both distributable packages (afs-core, afs-server) to a package
+# Publishes the distributable packages (afs-core, afs-server) to a package
 # index. Two paths:
 #
-#   - push a tag matching v*.*.*  -> publish to PyPI (production)
-#   - manual workflow_dispatch    -> publish to TestPyPI (dry-run rehearsal)
+#   - push a tag matching v*.*.*  -> publish BOTH packages to PyPI (production)
+#   - manual workflow_dispatch    -> publish the chosen package(s) to the chosen
+#                                     index. Use this to rehearse on TestPyPI, or
+#                                     to bootstrap one package onto an index
+#                                     (e.g. publish just afs-core to PyPI to clear
+#                                     a pending Trusted Publisher) before
+#                                     tag-driven releases publish both together.
 #
 # Auth is PyPI Trusted Publishing (OIDC) — no API tokens or secrets. `uv
 # publish` reads the GitHub OIDC token (id-token: write) automatically; the
@@ -21,13 +26,23 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
     inputs:
-      target:
-        description: 'Index to publish to (workflow_dispatch only publishes to TestPyPI).'
+      index:
+        description: 'Index to publish to.'
         required: true
         default: 'testpypi'
         type: choice
         options:
           - testpypi
+          - pypi
+      package:
+        description: 'Which package(s) to publish.'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - afs-core
+          - afs-server
 
 permissions:
   contents: read
@@ -70,12 +85,14 @@ jobs:
           name: dist
           path: dist/
 
-  publish-testpypi:
-    # Dry-run path: manual dispatch only.
+  publish-dispatch:
+    # Manual path: publish the chosen package(s) to the chosen index. The
+    # environment is selected from the input so it matches the Trusted Publisher
+    # configured on that index (pypi | testpypi).
     if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
-    environment: testpypi
+    environment: ${{ inputs.index }}
     permissions:
       id-token: write # OIDC token for Trusted Publishing
       contents: read
@@ -88,8 +105,27 @@ jobs:
           name: dist
           path: dist
 
-      - name: Publish to TestPyPI (Trusted Publishing)
-        run: uv publish --publish-url https://test.pypi.org/legacy/ --trusted-publishing always dist/*
+      - name: Resolve distributions + index URL
+        id: sel
+        env:
+          PACKAGE: ${{ inputs.package }}
+          INDEX: ${{ inputs.index }}
+        run: |
+          set -euo pipefail
+          case "$PACKAGE" in
+            afs-core)   echo "glob=dist/afs_core-*"   >> "$GITHUB_OUTPUT" ;;
+            afs-server) echo "glob=dist/afs_server-*" >> "$GITHUB_OUTPUT" ;;
+            all)        echo "glob=dist/*"            >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::unknown package '$PACKAGE'"; exit 1 ;;
+          esac
+          if [ "$INDEX" = "testpypi" ]; then
+            echo "url=--publish-url https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish (${{ inputs.package }} -> ${{ inputs.index }})
+        run: uv publish ${{ steps.sel.outputs.url }} --trusted-publishing always ${{ steps.sel.outputs.glob }}
 
   publish-pypi:
     # Production path: only on a v*.*.* tag push.
