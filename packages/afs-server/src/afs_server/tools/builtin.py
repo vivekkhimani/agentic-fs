@@ -102,3 +102,56 @@ class FsReadTool:
                     deps.resolve(), namespace, path, start_page=start_page, end_page=end_page
                 )
             )
+
+
+class FsGlobTool:
+    name = "fs_glob"
+    required_scopes = frozenset({"fs:read"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def fs_glob(namespace: str, pattern: str, limit: int = 100) -> dict[str, Any]:
+            """Find document paths in a namespace matching a glob (e.g. `**/*.pdf`).
+
+            `*`/`?`/`[seq]` are supported and `*` matches across `/` (recursive).
+            Cheaper than fs_grep when you only need paths, not content.
+            """
+            return await _result(deps.fs.glob(deps.resolve(), namespace, pattern, limit=limit))
+
+
+class FsGrepTool:
+    name = "fs_grep"
+    required_scopes = frozenset({"fs:read"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def fs_grep(
+            namespace: str,
+            pattern: str,
+            path_glob: str = "*",
+            ignore_case: bool = True,
+            context_lines: int = 0,
+            max_files: int = 200,
+            max_matches: int = 100,
+        ) -> dict[str, Any]:
+            """Regex-search documents' extracted text in a namespace (two-stage, bounded).
+
+            `pattern` is a regex; `path_glob` narrows which docs are scanned first.
+            Results are capped (files / matches / bytes); `truncated: true` means a
+            budget was hit — narrow with `path_glob` or a tighter `pattern`. Each hit
+            gives `path` + `page` — pass those to fs_read for the full surrounding text.
+            """
+            return await _result(
+                deps.fs.grep(
+                    deps.resolve(),
+                    namespace,
+                    pattern,
+                    path_glob=path_glob,
+                    ignore_case=ignore_case,
+                    context_lines=context_lines,
+                    max_files=max_files,
+                    max_matches=max_matches,
+                )
+            )

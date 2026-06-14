@@ -36,3 +36,27 @@ class ReadResponse(BaseModel):
     page_count: int
     range: tuple[int, int]
     truncated: bool
+
+
+class GlobResponse(BaseModel):
+    """Catalog paths matching a glob pattern."""
+
+    paths: list[str]
+    next_cursor: str | None = None
+
+
+class GrepMatch(BaseModel):
+    path: str
+    page: int  # 1-based derived page
+    line: int  # 1-based line within the page
+    text: str  # the matching line (length-capped)
+    before: list[str] = []  # context lines (when requested)
+    after: list[str] = []
+
+
+class GrepResponse(BaseModel):
+    """Bounded two-stage grep results over a namespace's derived text."""
+
+    matches: list[GrepMatch]
+    files_searched: int
+    truncated: bool  # a budget (files/matches/bytes) was hit — narrow the query

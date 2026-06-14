@@ -132,10 +132,12 @@ it — so the system is demoable at every step (plan §15).
   — the **pluggable tool registry** (`afs.tools` entry-points, so new tools are
   add-don't-fork) + a uniform **middleware** (visibility-filtered `tools/list`,
   per-call scope enforcement, audit) have **landed** ✅; the four read tools now
-  run through it ([tools swap-guide](swap-guides/tools.md)). Next: the **two-stage
-  budgeted `fs_grep`** (catalog coarse-filter → regex on the subset), `fs_glob`,
-  the **scratch** workspace tools, and per-call **budgets**. *Exit:* an agent
-  greps a 1k-file corpus under budget.
+  run through it ([tools swap-guide](swap-guides/tools.md)). The **two-stage
+  budgeted `fs_grep`** (catalog coarse-filter → regex on the candidates' derived
+  text, with file/match/byte budgets + a `truncated` signal) and **`fs_glob`**
+  have landed ✅. Next: the **scratch** workspace tools, then generic per-call
+  **budgets** in the middleware. *Exit:* an agent greps a 1k-file corpus under
+  budget.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
   `compute_fargate`/`network`, `observability`, `security_guardduty`,
   `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));
