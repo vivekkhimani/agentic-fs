@@ -55,13 +55,19 @@ jobs:
           IMAGE: ${{ steps.build.outputs.image }}
         run: |
           set -euo pipefail
-          if aws lambda get-function --function-name "$IMAGE_NAME" >/dev/null 2>&1; then
+          # Distinguish "not created yet" (skip gracefully) from any other failure
+          # (e.g. AccessDenied) which must fail LOUD — a silently-swallowed roll
+          # error is how a stale Lambda hid for hours.
+          if err=$(aws lambda get-function --function-name "$IMAGE_NAME" 2>&1 >/dev/null); then
             aws lambda update-function-code \
               --function-name "$IMAGE_NAME" --image-uri "$IMAGE" --publish >/dev/null
             echo "Rolled $IMAGE_NAME to $IMAGE"
-          else
+          elif printf '%s' "$err" | grep -q 'ResourceNotFoundException'; then
             echo "Lambda $IMAGE_NAME not created yet — image pushed only."
             echo "Create it with: terraform apply -var enable_compute=true -var image_tag=${GITHUB_SHA::12}"
+          else
+            echo "::error::Cannot roll $IMAGE_NAME — get-function failed: $err"
+            exit 1
           fi
 
   # The extractor-worker image (afs-server[docling]). Separate job so the heavy
@@ -103,10 +109,15 @@ jobs:
           IMAGE: ${{ steps.build.outputs.image }}
         run: |
           set -euo pipefail
-          if aws lambda get-function --function-name "$WORKER_NAME" >/dev/null 2>&1; then
+          # See the API roll step: not-created skips gracefully; anything else
+          # (AccessDenied, etc.) fails LOUD instead of being swallowed.
+          if err=$(aws lambda get-function --function-name "$WORKER_NAME" 2>&1 >/dev/null); then
             aws lambda update-function-code \
               --function-name "$WORKER_NAME" --image-uri "$IMAGE" --publish >/dev/null
             echo "Rolled $WORKER_NAME to $IMAGE"
-          else
+          elif printf '%s' "$err" | grep -q 'ResourceNotFoundException'; then
             echo "Lambda $WORKER_NAME not created yet — image pushed only (create via the ingestion module)."
+          else
+            echo "::error::Cannot roll $WORKER_NAME — get-function failed: $err"
+            exit 1
           fi
