@@ -158,12 +158,14 @@ it — so the system is demoable at every step (plan §15).
   auto-PRM) and the middleware resolves the principal from the verified token, so
   **M3 enforcement is now live** (10 wiring tests: REST 401/forged-token, MCP
   provider + token→principal) → ④ `auth_cognito` is **deferred, greenfield-only**
-  (not core; `static-jwt` mode + recipes cover the no-IdP gap). **DX multipliers:**
-  `static-jwt` local mode ✅ (a PEM public key, full path offline) + auto-served
-  PRM ✅; **queued:** `afs auth doctor` (paste a token → see claims + resolved
-  context) and per-IdP recipe pages (WorkOS/Cognito/Auth0/Okta/Keycloak).
-  *Exit:* authenticated end-to-end against **seamind-learn's WorkOS** issuer
-  (real external IdP), with tenant isolation + scope denial verified live.
+  (not core; `static-jwt` mode + recipes cover the no-IdP gap). **DX multipliers
+  all landed** ✅: `afs auth doctor` (Click CLI — paste a token → decoded claims +
+  resolved principal, or a precise failure hint), auto-served PRM (RFC 9728,
+  zero client auth code), `static-jwt` offline mode, and a **bring-your-own-IdP
+  swap-guide** with per-IdP recipes ([auth swap-guide](swap-guides/auth.md):
+  WorkOS/Cognito/Auth0/Okta/Keycloak). *Remaining:* the live **seamind-learn
+  WorkOS** spike (use `afs auth doctor` on a real token) — the exit criterion;
+  tenant isolation + scope denial verified live.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
   `compute_fargate`/`network`, `observability`, `security_guardduty`,
   `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));

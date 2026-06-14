@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "afs-core",
     "httpx>=0.27",
+    "click>=8",
 ]
 
 [project.optional-dependencies]
