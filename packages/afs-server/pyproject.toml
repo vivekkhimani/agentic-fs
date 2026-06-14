@@ -44,6 +44,9 @@ docling = ["docling>=2", "torch", "torchvision"]
 # AWS Textract OCR rung (managed; no local ML). boto3 is already a base dep; this
 # adds Pillow for rasterizing PDF pages before OCR.
 textract = ["pillow>=10"]
+# Tesseract OCR rung (lightweight, self-hosted). Also requires the tesseract
+# system binary at runtime (not a pip dep).
+tesseract = ["pytesseract>=0.3", "pillow>=10"]
 # Reserved for future backends. Intentionally empty until the dependencies
 # exist — declaring the names now keeps the install surface stable.
 # TODO: add the Postgres catalog backend deps when that store lands.

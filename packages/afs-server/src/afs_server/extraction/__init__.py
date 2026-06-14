@@ -17,6 +17,7 @@ from afs_server.extraction.docx import DocxNormalizer
 from afs_server.extraction.pdf import PdfNormalizer
 from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline
 from afs_server.extraction.runner import run_extraction
+from afs_server.extraction.tesseract import TesseractNormalizer
 from afs_server.extraction.text_native import TextNativeNormalizer
 from afs_server.extraction.textract import TextractNormalizer
 
@@ -30,6 +31,7 @@ _BUILTIN_NORMALIZERS = {
     "pdf": PdfNormalizer,
     "docx": DocxNormalizer,
     "textract": TextractNormalizer,
+    "tesseract": TesseractNormalizer,
     "docling": DoclingNormalizer,
 }
 
