@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from afs_core.contracts import CatalogStore, Normalizer, ObjectStore
+from afs_core.contracts import CatalogStore, Connector, Normalizer, ObjectStore
 from afs_core.errors import NotFoundError, QuotaExceededError
 from afs_core.models import (
     CatalogEntry,
@@ -20,6 +20,7 @@ from afs_core.models import (
     NamespaceRecord,
     PrincipalRecord,
     SourceDocument,
+    SourceItem,
     SyncCheckpoint,
     TenantRecord,
 )
@@ -218,3 +219,35 @@ class NormalizerConformance:
         assert result.pages, "a successful normalize must yield at least one page"
         assert all(p.number >= 1 for p in result.pages)
         assert result.quality.page_count == len(result.pages)
+
+
+class ConnectorConformance:
+    """Certifies a ``Connector`` implementation.
+
+    Override ``connector`` to return your impl pointed at a source already
+    populated with at least two documents.
+    """
+
+    @pytest.fixture
+    def connector(self) -> Connector:
+        raise NotImplementedError("override `connector` with an impl over a populated source")
+
+    def test_discovers_clean_relative_paths(self, connector: Connector) -> None:
+        items = list(connector.discover())
+        assert items, "discover() must yield the source's documents"
+        for item in items:
+            assert isinstance(item, SourceItem)
+            assert item.path and not item.path.startswith("/"), "paths are relative POSIX paths"
+            assert ".." not in item.path.split("/"), "no parent-traversal segments"
+            assert item.locator, "every item needs a locator fetch() can use"
+
+    def test_discover_is_repeatable(self, connector: Connector) -> None:
+        # The engine may enumerate more than once (e.g. with --prune); discovery
+        # must not be a one-shot generator that exhausts.
+        first = {item.path for item in connector.discover()}
+        second = {item.path for item in connector.discover()}
+        assert first == second
+
+    def test_fetch_returns_bytes(self, connector: Connector) -> None:
+        item = next(iter(connector.discover()))
+        assert isinstance(connector.fetch(item), bytes)

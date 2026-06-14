@@ -71,4 +71,5 @@ update_changelog_on_bump = true
 version_files = [
     "packages/afs-core/pyproject.toml:^version =",
     "packages/afs-server/pyproject.toml:^version =",
+    "packages/afs-connector-sdk/pyproject.toml:^version =",
 ]

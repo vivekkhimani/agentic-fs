@@ -43,6 +43,7 @@ on:
           - all
           - afs-core
           - afs-server
+          - afs-connector-sdk
 
 permissions:
   contents: read
@@ -62,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
-          for pkg in afs-core afs-server; do
+          for pkg in afs-core afs-server afs-connector-sdk; do
             ver="$(uv version --project "packages/${pkg}" --short)"
             if [ "$ver" != "$tag" ]; then
               echo "::error::Tag v${tag} != ${pkg} version ${ver}. Bump pyproject versions to match the tag."
@@ -71,12 +72,13 @@ jobs:
             echo "${pkg}: ${ver} == tag ${tag}"
           done
 
-      - name: Build wheels + sdists for both packages
+      - name: Build wheels + sdists for all packages
         run: |
           set -euo pipefail
           rm -rf dist
           uv build --package afs-core --out-dir dist
           uv build --package afs-server --out-dir dist
+          uv build --package afs-connector-sdk --out-dir dist
           ls -l dist
 
       - name: Upload build artifacts
@@ -113,9 +115,10 @@ jobs:
         run: |
           set -euo pipefail
           case "$PACKAGE" in
-            afs-core)   echo "glob=dist/afs_core-*"   >> "$GITHUB_OUTPUT" ;;
-            afs-server) echo "glob=dist/afs_server-*" >> "$GITHUB_OUTPUT" ;;
-            all)        echo "glob=dist/*"            >> "$GITHUB_OUTPUT" ;;
+            afs-core)          echo "glob=dist/afs_core-*"          >> "$GITHUB_OUTPUT" ;;
+            afs-server)        echo "glob=dist/afs_server-*"        >> "$GITHUB_OUTPUT" ;;
+            afs-connector-sdk) echo "glob=dist/afs_connector_sdk-*" >> "$GITHUB_OUTPUT" ;;
+            all)               echo "glob=dist/*"                   >> "$GITHUB_OUTPUT" ;;
             *) echo "::error::unknown package '$PACKAGE'"; exit 1 ;;
           esac
           if [ "$INDEX" = "testpypi" ]; then
