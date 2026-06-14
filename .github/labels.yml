@@ -1,0 +1,67 @@
+# Label manifest — the source of truth for this repo's labels.
+# Synced to GitHub by .github/workflows/labels.yml (crazy-max/ghaction-github-labeler).
+# Area labels are applied automatically by .github/labeler.yml; type/triage labels are applied by hand.
+
+# ── Area: which part of the codebase a change touches ──────────────────────────
+- name: core
+  color: "1d76db"
+  description: "afs-core — contracts, models, conformance kits"
+- name: server
+  color: "0052cc"
+  description: "afs-server — FastAPI + FastMCP service, stores"
+- name: extractors
+  color: "5319e7"
+  description: "Extraction pipeline and rungs (docling, textract, tesseract, …)"
+- name: mcp
+  color: "006b75"
+  description: "MCP server, middleware, tools"
+- name: connectors
+  color: "0e8a16"
+  description: "afs-connector-sdk and ingestion connectors"
+- name: infra
+  color: "c5def5"
+  description: "Terraform modules, examples, deployment"
+- name: docs
+  color: "0075ca"
+  description: "Documentation — ADRs, guides, README"
+- name: ci
+  color: "bfdadc"
+  description: "CI workflows, tooling, repo automation"
+- name: tests
+  color: "fbca04"
+  description: "Test suites and fixtures"
+- name: dependencies
+  color: "0366d6"
+  description: "Dependency updates (uv.lock, pyproject)"
+
+# ── Type / triage ──────────────────────────────────────────────────────────────
+- name: bug
+  color: "d73a4a"
+  description: "Something isn't working"
+- name: enhancement
+  color: "a2eeef"
+  description: "New feature or request"
+- name: good first issue
+  color: "7057ff"
+  description: "Good for newcomers"
+- name: help wanted
+  color: "008672"
+  description: "Extra attention is needed"
+- name: question
+  color: "d876e3"
+  description: "Further information is requested"
+- name: security
+  color: "b60205"
+  description: "Security-sensitive — see SECURITY.md before discussing publicly"
+- name: breaking-change
+  color: "d93f0b"
+  description: "Changes a public contract, API, or wire format"
+- name: needs-triage
+  color: "ededed"
+  description: "Awaiting initial review and labeling"
+- name: duplicate
+  color: "cfd3d7"
+  description: "This issue or pull request already exists"
+- name: wontfix
+  color: "ffffff"
+  description: "This will not be worked on"
