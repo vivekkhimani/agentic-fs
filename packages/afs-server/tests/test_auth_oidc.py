@@ -66,10 +66,30 @@ async def test_valid_token_maps_to_context(keypair: RSAKeyPair) -> None:
     assert ctx.namespaces == frozenset({"handbook", "eng"})
 
 
-async def test_absent_namespaces_claim_is_tenant_wide(keypair: RSAKeyPair) -> None:
-    settings = _settings(keypair)
+def test_absent_namespaces_claim_fails_safe(keypair: RSAKeyPair) -> None:
+    settings = _settings(keypair)  # no default configured
     ctx = context_from_claims({"sub": "u", "tenant_id": "acme", "scope": "fs:read"}, settings)
-    assert ctx.namespaces is None  # tenant-wide; tenant_id still isolates
+    assert ctx.namespaces == frozenset()  # deny-all: namespaces are the data boundary
+
+
+def test_default_namespaces_wildcard_is_tenant_wide(keypair: RSAKeyPair) -> None:
+    settings = _settings(keypair, oidc_default_namespaces="*")
+    ctx = context_from_claims({"sub": "u", "tenant_id": "acme", "scope": "fs:read"}, settings)
+    assert ctx.namespaces is None  # opt-in tenant-wide; tenant_id still isolates
+
+
+def test_default_namespaces_list(keypair: RSAKeyPair) -> None:
+    settings = _settings(keypair, oidc_default_namespaces="handbook, eng")
+    ctx = context_from_claims({"sub": "u", "tenant_id": "acme", "scope": "fs:read"}, settings)
+    assert ctx.namespaces == frozenset({"handbook", "eng"})
+
+
+def test_claim_wildcard_is_tenant_wide(keypair: RSAKeyPair) -> None:
+    settings = _settings(keypair)
+    ctx = context_from_claims(
+        {"sub": "u", "tenant_id": "acme", "scope": "fs:read", "afs_namespaces": "*"}, settings
+    )
+    assert ctx.namespaces is None  # a token may grant tenant-wide explicitly
 
 
 def test_scopes_accept_string_or_list(keypair: RSAKeyPair) -> None:

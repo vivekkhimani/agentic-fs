@@ -125,17 +125,17 @@ def _scope_set(value: object) -> frozenset[str]:
     raise UnauthenticatedError(f"unexpected scopes claim type: {type(value).__name__}")
 
 
-def _namespace_set(value: object) -> frozenset[str] | None:
-    """Granted namespaces: a list, or a comma/space-delimited string. Absent
-    (``None``) means tenant-wide — ``tenant_id`` still isolates and scopes still
-    gate, so this is a deliberate, documented default, not an open door."""
-    if value is None:
-        return None
+def _coerce_namespaces(value: object) -> frozenset[str] | None:
+    """A namespaces value (claim or configured default) → grant set. A list or a
+    comma/space-delimited string; the sentinel ``*`` (alone or in the set) means
+    tenant-wide (returns ``None``: ``tenant_id`` still isolates, scopes still gate)."""
     if isinstance(value, str):
-        return frozenset(p for p in re.split(r"[,\s]+", value) if p)
-    if isinstance(value, (list, tuple, set)):
-        return frozenset(str(v) for v in value)
-    raise UnauthenticatedError(f"unexpected namespaces claim type: {type(value).__name__}")
+        parts = [p for p in re.split(r"[,\s]+", value) if p]
+    elif isinstance(value, (list, tuple, set)):
+        parts = [str(v) for v in value]
+    else:
+        raise UnauthenticatedError(f"unexpected namespaces claim type: {type(value).__name__}")
+    return None if "*" in parts else frozenset(parts)
 
 
 def context_from_claims(claims: Mapping[str, Any], settings: Settings) -> TenantContext:
@@ -155,9 +155,18 @@ def context_from_claims(claims: Mapping[str, Any], settings: Settings) -> Tenant
             f"token missing tenant claim {settings.oidc_tenant_claim!r} and no "
             "AFS_OIDC_DEFAULT_TENANT fallback is set"
         )
+    # Namespaces are the *data* boundary (scopes are only the capability gate), so
+    # an absent claim FAILS SAFE: deny all namespaces unless a deployment opts into
+    # a default via AFS_OIDC_DEFAULT_NAMESPACES ("*" = tenant-wide, or a list).
+    ns_raw = claims.get(settings.oidc_namespaces_claim)
+    if ns_raw is None:
+        ns_raw = settings.oidc_default_namespaces
+    namespaces: frozenset[str] | None = (
+        frozenset() if ns_raw is None else _coerce_namespaces(ns_raw)
+    )
     return TenantContext(
         tenant_id=str(tenant),
         principal_id=str(principal),
         scopes=_scope_set(claims.get(settings.oidc_scopes_claim)),
-        namespaces=_namespace_set(claims.get(settings.oidc_namespaces_claim)),
+        namespaces=namespaces,
     )

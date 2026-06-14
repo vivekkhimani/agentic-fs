@@ -100,14 +100,18 @@ class Settings(BaseSettings):
     oidc_public_key: str | None = None  # static-jwt mode (PEM)
     # Claim → TenantContext mapping. Defaults fit the common case; override the
     # names that differ per IdP (e.g. WorkOS tenant=org_id, Cognito=custom:tenant_id).
-    # Scopes are TRUSTED FROM THE TOKEN (no role mapping); namespaces come from a
-    # claim. An absent namespaces claim = tenant-wide (tenant_id still isolates and
-    # scopes still gate). An absent tenant claim falls back to oidc_default_tenant.
+    # Scopes are TRUSTED FROM THE TOKEN (no role mapping). An absent tenant claim
+    # falls back to oidc_default_tenant.
     oidc_principal_claim: str = "sub"
     oidc_tenant_claim: str = "tenant_id"
     oidc_default_tenant: str | None = None
     oidc_scopes_claim: str = "scope"
+    # Namespaces are the data boundary, so an absent namespaces claim FAILS SAFE
+    # (deny all). Set this to opt a deployment into a default when the claim is
+    # absent: "*" = tenant-wide (single-tenant convenience), or a comma/space list
+    # of namespaces. The claim itself may also be "*" to grant tenant-wide per token.
     oidc_namespaces_claim: str = "afs_namespaces"
+    oidc_default_namespaces: str | None = None
 
 
 def load_settings() -> Settings:
