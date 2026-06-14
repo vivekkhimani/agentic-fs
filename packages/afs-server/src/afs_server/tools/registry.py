@@ -11,13 +11,21 @@ from __future__ import annotations
 from importlib.metadata import entry_points
 
 from afs_server.tools.base import Tool
-from afs_server.tools.builtin import FsListTool, FsReadTool, FsStatTool, WhoamiTool
+from afs_server.tools.builtin import (
+    FsGlobTool,
+    FsGrepTool,
+    FsListTool,
+    FsReadTool,
+    FsStatTool,
+    WhoamiTool,
+)
 
 _TOOL_ENTRY_GROUP = "afs.tools"
 
 # Builtin tools: name -> factory (zero-arg). Always available.
 _BUILTIN_TOOLS: dict[str, type[Tool]] = {
-    cls.name: cls for cls in (WhoamiTool, FsListTool, FsStatTool, FsReadTool)
+    cls.name: cls
+    for cls in (WhoamiTool, FsListTool, FsStatTool, FsReadTool, FsGlobTool, FsGrepTool)
 }
 
 

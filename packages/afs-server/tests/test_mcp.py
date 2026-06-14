@@ -45,7 +45,19 @@ async def client() -> AsyncIterator[Client]:
 
 async def test_tools_are_listed(client: Client) -> None:
     names = {t.name for t in await client.list_tools()}
-    assert {"whoami", "fs_list", "fs_stat", "fs_read"} <= names
+    assert {"whoami", "fs_list", "fs_stat", "fs_read", "fs_glob", "fs_grep"} <= names
+
+
+async def test_fs_glob(client: Client) -> None:
+    res = await client.call_tool("fs_glob", {"namespace": "handbook", "pattern": "*.md"})
+    assert res.data["paths"] == ["intro.md"]  # the catalog_only scan.pdf doesn't match
+
+
+async def test_fs_grep(client: Client) -> None:
+    res = await client.call_tool("fs_grep", {"namespace": "handbook", "pattern": "hello"})
+    assert res.data["matches"][0]["path"] == "intro.md"
+    assert res.data["matches"][0]["text"] == "hello world"
+    assert res.data["truncated"] is False
 
 
 async def test_whoami(client: Client) -> None:
