@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     dynamodb_endpoint_url: str | None = None  # set for DynamoDB Local
 
     # --- extraction ---
+    # "inline" runs extraction synchronously in the request (text_native, no extra
+    # infra); "async" stores the doc + a `pending` row and lets the extractor
+    # worker complete it off an S3 event (ADR 0009). Default inline.
+    extraction_mode: str = "inline"
     # Comma-separated ladder of normalizer names, tried in order. The base image
     # runs "text_native"; richer rungs are opt-in and need their extra (e.g.
     # "text_native,docling" with afs-server[docling]).

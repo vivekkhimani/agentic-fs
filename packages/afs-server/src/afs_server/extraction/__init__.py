@@ -14,6 +14,7 @@ from importlib.metadata import entry_points
 from afs_core.contracts import Normalizer
 from afs_server.extraction.docling import DoclingNormalizer
 from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline
+from afs_server.extraction.runner import run_extraction
 from afs_server.extraction.text_native import TextNativeNormalizer
 
 _NORMALIZER_ENTRY_GROUP = "afs.normalizers"
@@ -50,4 +51,4 @@ def build_pipeline(ladder: list[str] | None = None) -> ExtractionPipeline:
     return ExtractionPipeline([_build_normalizer(n) for n in names])
 
 
-__all__ = ["ExtractionOutcome", "ExtractionPipeline", "build_pipeline"]
+__all__ = ["ExtractionOutcome", "ExtractionPipeline", "build_pipeline", "run_extraction"]
