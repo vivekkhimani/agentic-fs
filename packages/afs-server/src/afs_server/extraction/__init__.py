@@ -22,6 +22,7 @@ from afs_server.extraction.runner import run_extraction
 from afs_server.extraction.tesseract import TesseractNormalizer
 from afs_server.extraction.text_native import TextNativeNormalizer
 from afs_server.extraction.textract import TextractNormalizer
+from afs_server.extraction.textract_analyze import TextractAnalyzeNormalizer
 
 _NORMALIZER_ENTRY_GROUP = "afs.normalizers"
 
@@ -34,6 +35,7 @@ _BUILTIN_NORMALIZERS = {
     "pdftables": PdfTablesNormalizer,
     "docx": DocxNormalizer,
     "textract": TextractNormalizer,
+    "textract_analyze": TextractAnalyzeNormalizer,
     "tesseract": TesseractNormalizer,
     "rapidocr": RapidOcrNormalizer,
     "docling": DoclingNormalizer,
