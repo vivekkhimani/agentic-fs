@@ -37,6 +37,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------------------------------------------------------------------------
 FROM public.ecr.aws/lambda/python:3.12 AS runtime
 
+# docling's table model imports OpenCV (opencv-python), whose shared objects need
+# X11/GL system libraries absent from the minimal Lambda base (libxcb.so.1, …).
+RUN dnf install -y mesa-libGL glib2 libX11 libXext libSM libXrender libxcb \
+    && dnf clean all && rm -rf /var/cache/dnf
+
 # Put the resolved site-packages on the Lambda task root (it's on sys.path).
 COPY --from=builder /app/.venv/lib/python3.12/site-packages/ ${LAMBDA_TASK_ROOT}/
 
