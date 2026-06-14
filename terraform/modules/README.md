@@ -22,7 +22,7 @@ the apply role's write scope is widened in lockstep (see
 | `catalog_dynamodb` | ✅ done | table + 3 GSIs + TTL + PITR + deletion protection (default catalog) | `name_prefix`, `kms_key_arn`, `deletion_protection_enabled`, `point_in_time_recovery_enabled` | `table_name`, `table_arn`, `table_stream_arn` |
 | `ingestion` | 📝 scaffold | EventBridge rules, SQS + DLQ, extractor Lambda + ESM, reconciler, scheduler | `bucket_*`, `table_*`, `extractor_image_uri`, `max_concurrency`, `reconcile_schedule`, `enable_scan_gate` | `extract_queue_arn`, `dlq_arn` |
 | `compute_lambda` | ✅ done | api Lambda (image) + streaming Function URL + boundary-bound exec role (least-priv read) | `image_uri`, `bucket_*`, `catalog_table_*`, `kms_key_arn`, `permissions_boundary_arn`, `function_url_auth_type`, `auth_mode`, `memory_mb`, `timeout_seconds` | `function_url`, `function_arn`, `exec_role_arn` |
-| `observability` | 📝 scaffold | log groups, SNS topic, 5 alarms, optional dashboard/budget/CloudTrail | function/queue names, `alarm_email`, `log_retention_days` | `alerts_topic_arn` |
+| `observability` | ✅ done | SNS alerts topic + 7 component-gated high-signal alarms (DLQ poison, stuck backlog, Lambda errors/throttles, catalog throttling) | component names (all nullable), `alarm_email`, thresholds | `alerts_topic_arn`, `alarm_names` |
 | `ecr_mirror` | ✅ done | private ECR repo for the API image (image-mirror half deferred) | `name_prefix`, `untagged_expiry_days` | `repository_url`, `repository_arn` |
 
 ## Optional modules (flag-gated)

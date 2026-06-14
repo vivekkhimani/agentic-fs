@@ -74,13 +74,14 @@ Status against each:
 | Encryption / tenancy floor | `kms` | ✅ done | **Multi-tenant, enterprise-secure by default** — SSE-KMS on every object |
 | Catalog (list/glob/stat index) | `catalog_dynamodb` (default) / `catalog_postgres` | ✅ done | The **derived index** of S3 — navigation without O(corpus) S3 LISTs; healable; **swappable** |
 | Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | ✅ done (live) | **MCP-first, agent-shaped** — streaming Function URL (AWS_IAM); OAuth resource server + enforcement boundary still to come |
-| Ingest → extract → heal | `ingestion` ✅ | **Hybrid extraction** (ADR 0009): serving extracts common files **inline** (light `text_native,pdf,docx` ladder, instant) while the **S3-event worker** OCR-escalates the rest — EventBridge → SQS (+DLQ) → worker Lambda. The worker image is **parametric** (`Dockerfile.worker`, `AFS_EXTRAS` build arg): the slim default runs `text_native,pdf,docx,textract` (~700 MB, managed OCR, no torch); `docling` is an opt-in heavy build. A rung named without its extra declines safely. Skips rows already extracted inline. **Structured logging** (structlog → JSON in CloudWatch, console in dev; `AFS_LOG_LEVEL`) surfaces declines/escalation/per-doc progress; the **DLQ** is locked to the extract queue with a redrive-allow policy (move-back after a fix). The scheduled **reconciler** ([ADR 0011](decisions/0011-reconciliation.md), EventBridge rate → Lambda) heals catalog↔S3 drift: missing/stale/re-added objects are enqueued for the worker, orphaned rows are **soft-deleted** (tombstones revive if the file returns) ✅. CloudWatch **alarms** are the remaining piece |
+| Ingest → extract → heal | `ingestion` ✅ | **Hybrid extraction** (ADR 0009): serving extracts common files **inline** (light `text_native,pdf,docx` ladder, instant) while the **S3-event worker** OCR-escalates the rest — EventBridge → SQS (+DLQ) → worker Lambda. The worker image is **parametric** (`Dockerfile.worker`, `AFS_EXTRAS` build arg): the slim default runs `text_native,pdf,docx,textract` (~700 MB, managed OCR, no torch); `docling` is an opt-in heavy build. A rung named without its extra declines safely. Skips rows already extracted inline. **Structured logging** (structlog → JSON in CloudWatch, console in dev; `AFS_LOG_LEVEL`) surfaces declines/escalation/per-doc progress; the **DLQ** is locked to the extract queue with a redrive-allow policy (move-back after a fix). The scheduled **reconciler** ([ADR 0011](decisions/0011-reconciliation.md), EventBridge rate → Lambda) heals catalog↔S3 drift: missing/stale/re-added objects are enqueued for the worker, orphaned rows are **soft-deleted** (tombstones revive if the file returns) ✅. CloudWatch **alarms** now ship in the `observability` module (below) ✅ |
 | Connectors (source → ingest) | `afs-connector-sdk` | 🔧 local + S3 + Drive | **Point it at your documents** — client-side crawlers push to the ingest API, with **incremental sync** (version-skip + delta cursors, [ADR 0008](decisions/0008-incremental-sync.md)) so big sources aren't re-crawled wholesale. Local FS / S3 / **Google Drive** (OAuth + export) ship; Drive's delta `changes.list` + SharePoint are next |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
 | Auth — OAuth 2.1 **resource server** (core) | afs-server (`auth_mode=oidc`) | M4 🔜 | **Bring your own IdP** — we validate tokens + map claims, never issue them ([ADR 0013](decisions/0013-auth-oauth-resource-server.md)); works with WorkOS/Cognito/Auth0/Okta/Keycloak |
 | Auth — IdP (optional, greenfield only) | `auth_cognito` | opt | Batteries-included user pool for users with no IdP, $0 under free tier — never required |
 | Read/grep cache (optional) | `cache_elasticache` (Redis/Valkey) | opt | **Latency accelerator you switch on** — caches derived-text reads + grep prefetch (the ChromaFs Redis layer); off by default to keep ~$2/mo idle |
-| Malware gate, audit, alarms | `security_guardduty`, `observability` | opt | Enterprise hardening — none of it bolted on later |
+| Alarms / alerts | `observability` ✅ | default | SNS topic + 7 component-gated **high-signal** alarms (DLQ poison, stuck backlog, Lambda errors/throttles, catalog throttling) over the live footprint — wired into quickstart |
+| Malware gate, audit | `security_guardduty` | opt | Enterprise hardening — none of it bolted on later |
 
 ## Milestone roadmap
 
@@ -123,8 +124,9 @@ it — so the system is demoable at every step (plan §15).
   *Exit (met):* a corrupt PDF lands
   `catalog_only` and is still cite-able; a hand-deleted catalog row heals on the
   next reconciler sweep. Not M2-blocking, tracked on their own lanes: Drive's
-  **L2 delta** `changes.list` + **SharePoint** (connectors), CloudWatch **alarms**
-  (observability), and the presigned-upload ingest flow.
+  **L2 delta** `changes.list` + **SharePoint** (connectors) and the
+  presigned-upload ingest flow. (CloudWatch **alarms** shipped — see
+  `observability` below.)
   - **Backlog (nice-to-have):** named presets + content-type YAML routing shipped
     (above). What's left is **bundled example pipeline YAMLs** to copy/customize,
     optional opinionated domain bundles, and native Haystack-YAML import for fully
@@ -166,8 +168,16 @@ it — so the system is demoable at every step (plan §15).
   WorkOS/Cognito/Auth0/Okta/Keycloak). *Remaining:* the live **seamind-learn
   WorkOS** spike (use `afs auth doctor` on a real token) — the exit criterion;
   tenant isolation + scope denial verified live.
+- **M4 — Observability** ✅ ([`observability` module](../terraform/modules/observability/README.md))
+  — an SNS alerts topic + **7 component-gated, high-signal** CloudWatch alarms
+  over the live footprint (DLQ poison, stuck extract backlog, API/worker/
+  reconciler Lambda errors, API throttles, sustained catalog throttling); each
+  alarm is created only for components actually deployed, sends on fire **and**
+  clear, and stays quiet when idle. Wired into quickstart (`enable_observability`,
+  `alarm_email` → `alerts_topic_arn`). Apply role already permits CloudWatch+SNS,
+  so no `ci-roles` change. *Next:* optional dashboard + AWS Budgets toggles.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
-  `compute_fargate`/`network`, `observability`, `security_guardduty`,
+  `compute_fargate`/`network`, `security_guardduty`,
   `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));
   the `hardened`/`full`/`byo-postgres` example roots.
 - **Future swap — `fsspec` ObjectStore adapter** — a thin `ObjectStore` over
