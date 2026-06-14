@@ -27,6 +27,16 @@ class Settings(BaseSettings):
     catalog_table: str = "agentic-fs-catalog"
     dynamodb_endpoint_url: str | None = None  # set for DynamoDB Local
 
+    # --- extraction ---
+    # Comma-separated ladder of normalizer names, tried in order. The base image
+    # runs "text_native"; richer rungs are opt-in and need their extra (e.g.
+    # "text_native,docling" with afs-server[docling]).
+    extraction_ladder: str = "text_native"
+
+    @property
+    def extraction_ladder_names(self) -> list[str]:
+        return [name.strip() for name in self.extraction_ladder.split(",") if name.strip()]
+
     # --- auth ---
     # "dev" = a static local principal (NEVER for production); "oidc" = the OAuth
     # resource server (not yet implemented — fails closed until that slice lands).
