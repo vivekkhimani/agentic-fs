@@ -42,7 +42,7 @@ document to the Function URL → it lands in S3 (SSE-KMS), is extracted
 | Package | What's in it |
 |---|---|
 | `afs-core` | the **contracts** (`ObjectStore` · `CatalogStore` · `Normalizer` · `Connector` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** for each |
-| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + extraction pipeline** (10 rungs: lightweight `text_native`/`pdf`/`pdftables`/`docx` in-request, plus opt-in extras `textract`/`textract_analyze`/`tesseract`/`rapidocr`/`docling`/`llm` that escalate; **Haystack engine** by default with a slim ladder "lite" mode, **presets**, **content-type routing**, and a char+confidence quality gate — [ADR 0006](decisions/0006-extraction-normalizer-contract.md), [ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read`, in-process) |
+| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + extraction pipeline** (10 rungs: lightweight `text_native`/`pdf`/`pdftables`/`docx` in-request, plus opt-in extras `textract`/`textract_analyze`/`tesseract`/`rapidocr`/`docling`/`llm` that escalate; **Haystack engine** by default with a slim ladder "lite" mode, **presets**, **content-type routing**, and a char+confidence quality gate — [ADR 0006](decisions/0006-extraction-normalizer-contract.md), [ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read` · `fs_glob` · `fs_grep` · `scratch_*`, through a pluggable registry + uniform middleware — visibility/enforcement/audit/budget, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md), in-process) |
 | `afs-connector-sdk` | the **`fs-crawler` CLI** + `SyncEngine` (discover → **version-skip / checksum-skip** → ingest → prune, with **incremental delta + server-side checkpoints**, [ADR 0008](decisions/0008-incremental-sync.md)) + `IngestClient` (SigV4 / no-auth) + **Local FS**, **S3**, and **Google Drive** (OAuth + native-doc export) connectors ([ADR 0007](decisions/0007-connector-model.md)) — verified end-to-end against the live Function URL |
 
 The API is **containerized** ([`Dockerfile`](../Dockerfile), [ADR 0003](decisions/0003-container-image.md)):
@@ -128,7 +128,7 @@ it — so the system is demoable at every step (plan §15).
     (above). What's left is **bundled example pipeline YAMLs** to copy/customize,
     optional opinionated domain bundles, and native Haystack-YAML import for fully
     custom graphs.
-- **M3 — Grep, scratch, budgets** 🔧 ([ADR 0012](decisions/0012-mcp-tools-and-middleware.md))
+- **M3 — Grep, scratch, budgets** ✅ ([ADR 0012](decisions/0012-mcp-tools-and-middleware.md))
   — the **pluggable tool registry** (`afs.tools` entry-points, so new tools are
   add-don't-fork) + a uniform **middleware** (visibility-filtered `tools/list`,
   per-call scope enforcement, audit) have **landed** ✅; the four read tools now
@@ -136,13 +136,23 @@ it — so the system is demoable at every step (plan §15).
   budgeted `fs_grep`** (catalog coarse-filter → regex on the candidates' derived
   text, with file/match/byte budgets + a `truncated` signal) and **`fs_glob`**
   have landed ✅. The **scratch** workspace tools (`scratch_write`/`read`/`list`/
-  `delete` on the catalog's atomic quota, `fs:write:scratch`) have landed ✅. Next:
-  generic per-call **budgets** in the middleware (an output-size safety net beyond
-  each tool's own caps). *Exit:* an agent greps a 1k-file corpus under budget.
+  `delete` on the catalog's atomic quota, `fs:write:scratch`) have landed ✅. The
+  **uniform per-call output budget** (`AFS_TOOL_MAX_RESULT_BYTES`, 256 KiB default;
+  oversized results are rejected with a "narrow your query" error, not truncated)
+  rounds out the middleware so even a cap-less plugin tool stays inside the
+  context window ✅. *Exit:* an agent greps a 1k-file corpus under budget — met by
+  the bounded two-stage grep + the middleware net. The live MCP-surface dry-run is
+  the remaining validation.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
   `compute_fargate`/`network`, `observability`, `security_guardduty`,
   `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));
   the `hardened`/`full`/`byo-postgres` example roots.
+- **Future swap — `fsspec` ObjectStore adapter** — a thin `ObjectStore` over
+  [fsspec](https://filesystem-spec.readthedocs.io) would, with one adapter,
+  certify the contract against GCS / Azure Blob / HDFS / local / many more —
+  broadening "bring your own storage" beyond the S3-compatible set without a
+  per-backend store. Implement → run the conformance kit → register under
+  `afs.object_stores` (ADR 0002), same path as any other backend.
 
 ## How the pipeline keeps us safe as we add each piece
 
@@ -172,7 +182,8 @@ step of the read path, when the app actually serves requests — no premature sh
 ✅ afs-server: settings + store registry + S3 ObjectStore (moto-certified)
 ✅ afs-server: DynamoDB CatalogStore (certified by the same kit)
 ✅ afs-server: FsService read path + FastAPI app + Dockerfile + docker-compose
-✅ afs-server: MCP mount at /mcp (whoami/fs_list/fs_stat/fs_read, shared FsService)
+✅ afs-server: MCP mount at /mcp (whoami/fs_list/fs_stat/fs_read/fs_glob/fs_grep/scratch_*,
+      pluggable registry + uniform middleware, shared FsService)
 ✅ ecr_mirror + compute_lambda + image CD (image.yml: build/push/roll on merge)
 ✅ DEPLOYED — API LIVE on Lambda + Function URL (AWS_IAM); healthz/readyz/me/entries
       verified via SigV4. readyz=ok ⇒ the Lambda reached DynamoDB through its
@@ -181,8 +192,9 @@ step of the read path, when the app actually serves requests — no premature sh
       (S3→EventBridge→SQS→worker), 10-rung menu + Haystack engine/presets/routing,
       confidence gate; connector SDK (Local FS/S3/Drive) + incremental sync (L1)
 ✅ reconciler LIVE — scheduled catalog↔S3 heal (soft-delete orphans; re-adds revive)
-⏭️ M3: grep/glob + scratch namespace + MCP middleware (budgets/enforcement/audit) ← next
-      then OAuth 2.1 resource server (replaces dev-auth)
+✅ M3: pluggable tool registry + grep/glob + scratch namespace + MCP middleware
+      (visibility/enforcement/audit + uniform per-call output budget)
+⏭️ live MCP-surface dry-run, then OAuth 2.1 resource server (replaces dev-auth) ← next
 ```
 
 `compute_lambda` was the **first IAM-role-creating module**, so it takes a
