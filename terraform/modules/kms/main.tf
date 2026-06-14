@@ -42,4 +42,28 @@ data "aws_iam_policy_document" "key" {
       identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
     }
   }
+
+  # Let CloudWatch alarms publish to SNS topics encrypted with this CMK (the
+  # observability alerts topic). The cross-service publisher is the one principal
+  # that can't be granted via IAM — it needs a key-policy grant — so it lives
+  # here, scoped to this account. CloudWatch only wraps a data key to deliver an
+  # alarm notification; it never receives document plaintext. Without this,
+  # alarms would fire but notifications would silently fail to deliver.
+  statement {
+    sid       = "AllowCloudWatchAlarmsToUseKeyForEncryptedSns"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
 }

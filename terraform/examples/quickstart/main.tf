@@ -84,3 +84,21 @@ module "ingestion" {
   kms_key_arn              = module.kms.key_arn
   permissions_boundary_arn = data.terraform_remote_state.ci_roles.outputs.permissions_boundary_arn
 }
+
+# M4 — high-signal alarms over whatever is deployed, fanned out via one SNS topic.
+# Each target is only set when that component is enabled, so its alarm is created
+# only then (the module no-ops for null targets).
+module "observability" {
+  source = "../../modules/observability"
+  count  = var.enable_observability ? 1 : 0
+
+  name_prefix              = var.name_prefix
+  kms_key_arn              = module.kms.key_arn
+  alarm_email              = var.alarm_email
+  api_function_name        = var.enable_compute ? module.compute[0].function_name : null
+  worker_function_name     = var.enable_ingestion ? module.ingestion[0].worker_function_name : null
+  reconciler_function_name = var.enable_ingestion ? module.ingestion[0].reconciler_function_name : null
+  extract_queue_name       = var.enable_ingestion ? module.ingestion[0].queue_name : null
+  dlq_name                 = var.enable_ingestion ? module.ingestion[0].dlq_name : null
+  catalog_table_name       = module.catalog.table_name
+}

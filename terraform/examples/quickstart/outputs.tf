@@ -59,3 +59,8 @@ output "name_prefix" {
   description = "Resource name prefix in effect for this root."
   value       = var.name_prefix
 }
+
+output "alerts_topic_arn" {
+  description = "SNS topic the CloudWatch alarms publish to (null unless enable_observability = true). Subscribe Slack/PagerDuty/chatbot here."
+  value       = var.enable_observability ? module.observability[0].alerts_topic_arn : null
+}

@@ -72,3 +72,15 @@ variable "auth_mode" {
   type        = string
   default     = "dev"
 }
+
+variable "enable_observability" {
+  description = "Create the alerts SNS topic + high-signal CloudWatch alarms over the deployed components."
+  type        = bool
+  default     = true
+}
+
+variable "alarm_email" {
+  description = "Optional email subscribed to the alerts topic (confirm via AWS's email). Leave null and wire your own subscriber to alerts_topic_arn."
+  type        = string
+  default     = null
+}
