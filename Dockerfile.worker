@@ -45,11 +45,17 @@ RUN dnf install -y mesa-libGL glib2 libX11 libXext libSM libXrender libxcb \
 # Put the resolved site-packages on the Lambda task root (it's on sys.path).
 COPY --from=builder /app/.venv/lib/python3.12/site-packages/ ${LAMBDA_TASK_ROOT}/
 
-ENV AFS_EXTRACTION_LADDER="text_native,docling" \
-    # Lambda's only writable dir is /tmp — point model/HF caches there so docling
-    # can fetch its models at runtime. (Pre-baking models is a later optimization.)
+ENV AFS_EXTRACTION_LADDER="text_native,pdf,docx,docling" \
+    # Pre-baked models live here (read by the normalizer via artifacts_path); HF
+    # caches point at the only writable dir (/tmp) as a fallback.
+    DOCLING_ARTIFACTS_PATH="/opt/docling/models" \
     HF_HOME="/tmp/huggingface" \
     XDG_CACHE_HOME="/tmp/cache"
+
+# Pre-bake docling's models into the image so a cold start doesn't download
+# ~hundreds of MB from HuggingFace (and doesn't depend on HF being reachable).
+# Loaded offline via artifacts_path at runtime.
+RUN python -c "from pathlib import Path; from docling.utils.model_downloader import download_models; download_models(output_dir=Path('/opt/docling/models'))"
 
 # afs_server.worker.handler(event, context) — the SQS/S3-event entrypoint.
 CMD ["afs_server.worker.handler"]
