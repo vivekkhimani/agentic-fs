@@ -1,90 +1,109 @@
-"""``fs-crawler`` — crawl a source and ingest its documents into agentic-fs."""
+"""``fs-crawler`` — crawl a source and ingest its documents into agentic-fs (Click)."""
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import sys
-from collections.abc import Sequence
+
+import click
 
 from afs_connector_sdk.client import IngestClient
 from afs_connector_sdk.engine import SyncEngine, SyncReport
 from afs_connector_sdk.registry import build_connector
 
 
-def _parse_options(pairs: list[str]) -> dict[str, str]:
+def _parse_options(pairs: tuple[str, ...]) -> dict[str, str]:
     options: dict[str, str] = {}
     for pair in pairs:
         if "=" not in pair:
-            raise ValueError(f"--opt expects KEY=VALUE, got {pair!r}")
+            raise click.BadParameter(f"--opt expects KEY=VALUE, got {pair!r}")
         key, value = pair.split("=", 1)
         options[key] = value
     return options
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="fs-crawler",
-        description="Crawl a source and ingest its documents into agentic-fs.",
-    )
-    add = parser.add_argument
-    add("--connector", default="local", help="connector name (local, s3, or a plugin)")
-    add("--source", required=True, help="connector source (a directory, or s3://bucket/prefix)")
-    add("--api-url", required=True, help="agentic-fs API base URL")
-    add("--namespace", required=True, help="target namespace")
-    add("--auth", choices=["none", "sigv4"], default="none", help="how to authenticate to the API")
-    add("--region", default="us-east-1", help="AWS region (for --auth sigv4)")
-    add("--concurrency", type=int, default=8, help="max documents in flight")
-    add("--prune", action="store_true", help="delete agentic-fs docs no longer at the source")
-    add("--dry-run", action="store_true", help="report what would change without writing")
-    parser.add_argument(
-        "--opt",
-        action="append",
-        default=[],
-        metavar="KEY=VALUE",
-        help="connector-specific option (repeatable)",
-    )
-    return parser
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    args = _build_parser().parse_args(argv)
-
+@click.command()
+@click.option("--connector", default="local", help="Connector name (local, s3, or a plugin).")
+@click.option(
+    "--source", required=True, help="Connector source (a directory, or s3://bucket/prefix)."
+)
+@click.option("--api-url", required=True, help="agentic-fs API base URL.")
+@click.option("--namespace", required=True, help="Target namespace.")
+@click.option(
+    "--auth",
+    type=click.Choice(["none", "sigv4"]),
+    default="none",
+    help="How to authenticate to the API.",
+)
+@click.option("--region", default="us-east-1", help="AWS region (for --auth sigv4).")
+@click.option("--concurrency", type=int, default=8, help="Max documents in flight.")
+@click.option("--prune", is_flag=True, help="Delete agentic-fs docs no longer at the source.")
+@click.option("--dry-run", is_flag=True, help="Report what would change without writing.")
+@click.option(
+    "--opt",
+    "opts",
+    multiple=True,
+    metavar="KEY=VALUE",
+    help="Connector-specific option (repeatable).",
+)
+def main(
+    connector: str,
+    source: str,
+    api_url: str,
+    namespace: str,
+    auth: str,
+    region: str,
+    concurrency: int,
+    prune: bool,
+    dry_run: bool,
+    opts: tuple[str, ...],
+) -> None:
+    """Crawl a source and ingest its documents into agentic-fs."""
     try:
-        connector = build_connector(args.connector, args.source, **_parse_options(args.opt))
+        conn = build_connector(connector, source, **_parse_options(opts))
     except (ValueError, RuntimeError) as err:
-        print(f"error: {err}", file=sys.stderr)
-        return 2
+        raise click.ClickException(str(err)) from err
 
     signer = None
-    if args.auth == "sigv4":
+    if auth == "sigv4":
         from afs_connector_sdk.auth import SigV4Signer
 
         try:
-            signer = SigV4Signer(region=args.region)
+            signer = SigV4Signer(region=region)
         except RuntimeError as err:
-            print(f"error: {err}", file=sys.stderr)
-            return 2
+            raise click.ClickException(str(err)) from err
 
-    report = asyncio.run(_run(connector, args, signer))
-    tag = " (dry-run)" if args.dry_run else ""
-    print(
-        f"{args.connector} -> {args.namespace}{tag}: "
+    report = asyncio.run(
+        _run(
+            conn, api_url, namespace, signer, concurrency=concurrency, prune=prune, dry_run=dry_run
+        )
+    )
+    tag = " (dry-run)" if dry_run else ""
+    click.echo(
+        f"{connector} -> {namespace}{tag}: "
         f"ingested={report.ingested} skipped={report.skipped} "
         f"deleted={report.deleted} failed={report.failed}"
     )
     for line in report.errors[:20]:
-        print(f"  ! {line}", file=sys.stderr)
-    return 1 if report.failed else 0
+        click.echo(f"  ! {line}", err=True)
+    if report.failed:
+        sys.exit(1)
 
 
-async def _run(connector: object, args: argparse.Namespace, signer: object) -> SyncReport:
-    async with IngestClient(args.api_url, signer=signer) as client:  # type: ignore[arg-type]
-        engine = SyncEngine(
-            client, concurrency=args.concurrency, prune=args.prune, dry_run=args.dry_run
-        )
-        return await engine.sync(connector, args.namespace)  # type: ignore[arg-type]
+async def _run(
+    connector: object,
+    api_url: str,
+    namespace: str,
+    signer: object,
+    *,
+    concurrency: int,
+    prune: bool,
+    dry_run: bool,
+) -> SyncReport:
+    async with IngestClient(api_url, signer=signer) as client:  # type: ignore[arg-type]
+        engine = SyncEngine(client, concurrency=concurrency, prune=prune, dry_run=dry_run)
+        return await engine.sync(connector, namespace)  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

@@ -29,6 +29,11 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "fastmcp>=2",
+    # The `afs` admin CLI.
+    "click>=8",
+    # JWT decode/verify for the OAuth resource server + `afs auth doctor` (ADR 0013).
+    # Already a fastmcp transitive; declared directly since we import it.
+    "PyJWT>=2",
     # Structured logging — JSON to CloudWatch (queryable), console in dev. Pure
     # Python, MIT/Apache-2.0. Stdlib loggers bridge through it (logging_config).
     "structlog>=24",
@@ -37,6 +42,9 @@ dependencies = [
     "pypdfium2>=4",
     "python-docx>=1",
 ]
+
+[project.scripts]
+afs = "afs_server.cli:main"
 
 [project.optional-dependencies]
 # Rich extraction (PDF / Office / images) via Docling — pulls heavy ML deps, so
