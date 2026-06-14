@@ -55,6 +55,18 @@ resource "aws_sqs_queue_policy" "extract" {
   policy    = data.aws_iam_policy_document.queue.json
 }
 
+# Lock the DLQ down to *only* receive failures from the extract queue, and allow
+# a redrive (move messages back to extract) once a poison cause is fixed — the
+# operator runs `aws sqs start-message-move-task` against this DLQ. Without this
+# allow-policy the DLQ would accept redrive from any queue in the account.
+resource "aws_sqs_queue_redrive_allow_policy" "dlq" {
+  queue_url = aws_sqs_queue.dlq.id
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "byQueue"
+    sourceQueueArns   = [aws_sqs_queue.extract.arn]
+  })
+}
+
 # --- EventBridge: S3 object-created under tenants/ -> the queue ---
 resource "aws_cloudwatch_event_rule" "object_created" {
   name        = "${var.name_prefix}-object-created"
@@ -179,6 +191,7 @@ resource "aws_lambda_function" "worker" {
       AFS_CATALOG_TABLE        = var.catalog_table_name
       AFS_KMS_KEY_ARN          = var.kms_key_arn
       AFS_EXTRACTION_LADDER    = var.extraction_ladder
+      AFS_LOG_LEVEL            = var.log_level
     }
   }
 

@@ -4,7 +4,7 @@ variable "name_prefix" {
 }
 
 variable "image_uri" {
-  description = "Worker ECR image URI (e.g. <repo>:worker-<tag>). The afs-server[docling] image."
+  description = "Worker ECR image URI (e.g. <repo>:worker-<tag>). The Dockerfile.worker image — slim textract default unless built with extra rungs."
   type        = string
 }
 
@@ -86,4 +86,10 @@ variable "log_retention_days" {
   description = "CloudWatch log retention for the worker."
   type        = number
   default     = 30
+}
+
+variable "log_level" {
+  description = "AFS_LOG_LEVEL for the worker (structlog) — INFO surfaces extraction declines/escalation and per-document progress to CloudWatch; DEBUG to dig in, WARNING to quiet down."
+  type        = string
+  default     = "INFO"
 }

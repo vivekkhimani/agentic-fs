@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from afs_core.errors import AfsError
 from afs_server import __version__
 from afs_server.extraction import build_pipeline
+from afs_server.logging_config import configure_logging
 from afs_server.mcp import build_mcp
 from afs_server.routers import connectors, fs, ingest, meta
 from afs_server.services import FsService
@@ -36,6 +37,7 @@ async def _afs_error_handler(request: Request, exc: AfsError) -> JSONResponse:
 
 def create_app() -> FastAPI:
     settings = load_settings()
+    configure_logging(settings.log_level)
     # Stores are lazy (no I/O / credentials at construction), so we can build the
     # service + MCP server now and share the service between REST and MCP.
     catalog = get_catalog_store(settings)

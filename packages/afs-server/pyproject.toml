@@ -29,6 +29,9 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "fastmcp>=2",
+    # Structured logging — JSON to CloudWatch (queryable), console in dev. Pure
+    # Python, MIT/Apache-2.0. Stdlib loggers bridge through it (logging_config).
+    "structlog>=24",
     # Lightweight extraction rungs (pure-Python / a small binary, no ML) so common
     # files extract synchronously in-request. Heavier docling stays the `docling` extra.
     "pypdfium2>=4",
