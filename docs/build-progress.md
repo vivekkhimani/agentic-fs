@@ -24,6 +24,8 @@ lands into a pipeline and a data model already proven safe.
 | `agentic-fs-data-…` (S3) | **S3 is canonical** — the single source of truth the whole system heals from |
 | `agentic-fs-catalog` (DynamoDB) | The **derived index** of S3 — fast `list`/`glob`/`stat`; healable; first-class `catalog_only` |
 | `agentic-fs-api` (Lambda container) + streaming Function URL | **Serving compute is live** — the MCP+REST surface, rolled by image CD; exec role now carries the ingestion write path |
+| `agentic-fs-worker` (Lambda) + `agentic-fs-extract` SQS (+DLQ) + EventBridge rule | **Async extraction live** — S3 object-created → SQS → worker (re)extracts off the request path (ADR 0009) |
+| `agentic-fs-reconciler` (Lambda) + hourly EventBridge schedule | **Heal-from-S3 live** — scheduled catalog↔S3 reconciliation (ADR 0011) |
 
 Tag-discoverable resources (`Project=agentic-fs`), so the entire footprint
 is teardown-by-one-query — a design goal from day one, not an afterthought.
@@ -40,7 +42,7 @@ document to the Function URL → it lands in S3 (SSE-KMS), is extracted
 | Package | What's in it |
 |---|---|
 | `afs-core` | the **contracts** (`ObjectStore` · `CatalogStore` · `Normalizer` · `Connector` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** for each |
-| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + `ExtractionPipeline` write path** (lightweight `text_native`/`pdf`/`docx` rungs in-request; OCR/heavy rungs as opt-in extras — `textract` (AWS OCR), `docling` — escalate, [ADR 0006](decisions/0006-extraction-normalizer-contract.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read`, in-process) |
+| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + extraction pipeline** (10 rungs: lightweight `text_native`/`pdf`/`pdftables`/`docx` in-request, plus opt-in extras `textract`/`textract_analyze`/`tesseract`/`rapidocr`/`docling`/`llm` that escalate; **Haystack engine** by default with a slim ladder "lite" mode, **presets**, **content-type routing**, and a char+confidence quality gate — [ADR 0006](decisions/0006-extraction-normalizer-contract.md), [ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read`, in-process) |
 | `afs-connector-sdk` | the **`fs-crawler` CLI** + `SyncEngine` (discover → **version-skip / checksum-skip** → ingest → prune, with **incremental delta + server-side checkpoints**, [ADR 0008](decisions/0008-incremental-sync.md)) + `IngestClient` (SigV4 / no-auth) + **Local FS**, **S3**, and **Google Drive** (OAuth + native-doc export) connectors ([ADR 0007](decisions/0007-connector-model.md)) — verified end-to-end against the live Function URL |
 
 The API is **containerized** ([`Dockerfile`](../Dockerfile), [ADR 0003](decisions/0003-container-image.md)):
@@ -89,14 +91,14 @@ it — so the system is demoable at every step (plan §15).
 - **M0 — Foundation** ✅ — `kms` + `storage`. S3-is-canonical is now real.
 - **M1 — Read path** ✅ — `catalog_dynamodb` + `compute_lambda` + dev auth, live
   on the Function URL: an agent can `list`/`read` a corpus over MCP/REST.
-- **M2 — Ingestion & extraction** 🔧 in progress — **write path live**
+- **M2 — Ingestion & extraction** ✅ (exit met) — **write path live**
   (in-request `PUT`→extract→`derived/` + catalog row, verified on AWS); the
   **`docling` rung** (PDF/Office/images), the **connector SDK** (`fs-crawler`,
   Local FS + S3 + **Google Drive** with OAuth + native-doc export), and
   **incremental sync** (version-skip + delta cursors + server-side checkpoints,
   [ADR 0008](decisions/0008-incremental-sync.md)), and the **async extraction
   worker** + two-mode ingest + the **`ingestion` Terraform module** (EventBridge →
-  SQS → `docling` worker Lambda, [ADR 0009](decisions/0009-async-extraction-pipeline.md))
+  SQS → parametric worker Lambda, [ADR 0009](decisions/0009-async-extraction-pipeline.md))
   have landed (async path **live-validated**: a scanned PDF degrades to
   `catalog_only` inline and the worker escalates it via Textract OCR). The
   scheduled **reconciler** now heals catalog↔S3 drift (soft-delete orphans;
@@ -114,15 +116,17 @@ it — so the system is demoable at every step (plan §15).
   let users pick a curated pipeline instead of hand-listing rungs ✅.
   **Content-type routing** (`AFS_PIPELINE_FILE` → per-MIME ladders in YAML) sends
   images to vision, PDFs to table-structure rungs, etc. ✅ — this is what the
-  Haystack engine unlocks over the linear ladder. Then Drive's delta
-  `changes.list` (L2) + SharePoint. *Exit (met):* a corrupt PDF lands
+  Haystack engine unlocks over the linear ladder. (ADR 0010's optional size-gated
+  **LLM-router** tier — classify the doc, then pick the rung — is **not** built.)
+  *Exit (met):* a corrupt PDF lands
   `catalog_only` and is still cite-able; a hand-deleted catalog row heals on the
-  next reconciler sweep.
-  - **Backlog (post-engine):** ship a set of **pre-packaged Haystack pipeline
-    presets** users pick from instead of wiring components themselves — e.g.
-    `cheap-text` (lightweight only), `scanned-docs` (OCR escalation),
-    `tables-and-forms` (textract_analyze), `max-fidelity` (llm/multimodal),
-    `maritime` (drawings + tables + scans). Each a named, YAML-serialized pipeline.
+  next reconciler sweep. Not M2-blocking, tracked on their own lanes: Drive's
+  **L2 delta** `changes.list` + **SharePoint** (connectors), CloudWatch **alarms**
+  (observability), and the presigned-upload ingest flow.
+  - **Backlog (nice-to-have):** named presets + content-type YAML routing shipped
+    (above). What's left is **bundled example pipeline YAMLs** to copy/customize,
+    optional opinionated domain bundles, and native Haystack-YAML import for fully
+    custom graphs.
 - **M3 — Grep, scratch, budgets** — two-stage budgeted grep, scratch namespace,
   full MCP middleware (visibility, per-call enforcement, audit). *Exit:* an agent
   greps a 1k-file corpus under budget.
@@ -163,26 +167,32 @@ step of the read path, when the app actually serves requests — no premature sh
 ✅ DEPLOYED — API LIVE on Lambda + Function URL (AWS_IAM); healthz/readyz/me/entries
       verified via SigV4. readyz=ok ⇒ the Lambda reached DynamoDB through its
       least-priv, boundary-bound exec role. The whole AWS path works end-to-end.
-⏭️ ingestion + extraction → documents actually land and become readable          ← next
-      (the live API answers, but the corpus is empty until ingestion)
+✅ ingestion + extraction LIVE — PUT→extract→derived/+catalog row; async worker
+      (S3→EventBridge→SQS→worker), 10-rung menu + Haystack engine/presets/routing,
+      confidence gate; connector SDK (Local FS/S3/Drive) + incremental sync (L1)
+✅ reconciler LIVE — scheduled catalog↔S3 heal (soft-delete orphans; re-adds revive)
+⏭️ M3: grep/glob + scratch namespace + MCP middleware (budgets/enforcement/audit) ← next
+      then OAuth 2.1 resource server (replaces dev-auth)
 ```
 
-When `compute_lambda` lands it is the **first IAM-role-creating module**, so it
-takes a `permissions_boundary_arn` and sets it on the Lambda exec role, threaded
-from the `ci-roles` output (the boundary's escalation-prevention deny enforces it
-— `terraform/DECISIONS.md` §2a).
+`compute_lambda` was the **first IAM-role-creating module**, so it takes a
+`permissions_boundary_arn` and sets it on the Lambda exec role, threaded from the
+`ci-roles` output (the boundary's escalation-prevention deny enforces it —
+`terraform/DECISIONS.md` §2a). Every IAM-role-creating module since (`ingestion`'s
+worker + reconciler) follows the same rule.
 
 ## Remaining docket (roadmap)
 
 **Product — toward a demoable v1:**
 
-- **Ingestion & extraction (M2)** — write path ✅ (`put_document` → S3 + catalog
-  row); extraction is a **pluggable `Normalizer` contract** ✅ (`ExtractionPipeline`
-  ladder; `text_native` rung shipped, `docling`/your-own register via
-  `afs.normalizers` — [ADR 0006](decisions/0006-extraction-normalizer-contract.md),
-  [swap guide](swap-guides/extraction.md)). *Next on this track:* the event-driven
-  extractor worker (S3→SQS→pipeline), the connector SDK + `fs-crawler`, the
-  presigned-upload flow, and the reconciler.
+- **Ingestion & extraction (M2)** ✅ — write path (`put_document` → S3 + catalog
+  row); extraction is a **pluggable `Normalizer` contract** (10 rungs shipped;
+  third-party rungs register via `afs.normalizers` — [ADR 0006](decisions/0006-extraction-normalizer-contract.md),
+  [swap guide](swap-guides/extraction.md)) on the **Haystack engine** (ADR 0010);
+  the **async extractor worker** (S3→SQS→pipeline), the **connector SDK +
+  `fs-crawler`** (Local FS/S3/Drive), and the **reconciler** ([ADR 0011](decisions/0011-reconciliation.md))
+  have all landed. *Still open on this track:* the **presigned-upload** ingest
+  flow, Drive **L2 delta** + **SharePoint** connectors.
 - **Grep, scratch, budgets (M3)** — two-stage grep, glob, the scratch namespace,
   and the full MCP middleware (per-call enforcement, budgets, audit log).
 - **OAuth 2.1 resource server** (+ `auth_cognito`) — replaces dev-auth; required
