@@ -11,17 +11,19 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 from typing import Any
 from urllib.parse import unquote_plus
 
+import structlog
+
 from afs_core import keys
 from afs_server.extraction import build_pipeline
+from afs_server.logging_config import configure_logging
 from afs_server.services import IngestService
 from afs_server.settings import load_settings
 from afs_server.stores import get_catalog_store, get_object_store
 
-logger = logging.getLogger("afs_server.worker")
+logger = structlog.get_logger("afs_server.worker")
 
 
 def object_keys_from_event(event: dict[str, Any]) -> list[str]:
@@ -36,7 +38,7 @@ def object_keys_from_event(event: dict[str, Any]) -> list[str]:
         try:
             body = json.loads(record["body"])
         except (KeyError, json.JSONDecodeError):
-            logger.warning("skipping malformed SQS record")
+            logger.warning("skipping malformed SQS record", message_id=record.get("messageId"))
             continue
         if isinstance(body.get("detail"), dict):  # EventBridge
             key = body["detail"].get("object", {}).get("key")
@@ -55,23 +57,29 @@ async def process_keys(ingest: IngestService, object_keys: list[str]) -> int:
     for key in object_keys:
         parsed = keys.parse_key(key)
         if parsed is None or not keys.is_indexable(key) or not (parsed.namespace and parsed.path):
-            logger.info("skipping non-original key %s", key)
+            logger.info("skipping non-original key", key=key)
             continue
         await ingest.extract_object(parsed.tenant_id, parsed.namespace, parsed.path)
+        logger.info(
+            "extracted object",
+            tenant_id=parsed.tenant_id,
+            namespace=parsed.namespace,
+            path=parsed.path,
+        )
         processed += 1
     return processed
 
 
-def _build_ingest() -> IngestService:
+def handler(event: dict[str, Any], context: object = None) -> dict[str, Any]:
+    """Lambda entrypoint."""
     settings = load_settings()
-    return IngestService(
+    configure_logging(settings.log_level)
+    object_keys = object_keys_from_event(event)
+    ingest = IngestService(
         get_catalog_store(settings),
         get_object_store(settings),
         build_pipeline(settings.extraction_ladder_names),
     )
-
-
-def handler(event: dict[str, Any], context: object = None) -> dict[str, Any]:
-    """Lambda entrypoint."""
-    processed = asyncio.run(process_keys(_build_ingest(), object_keys_from_event(event)))
+    processed = asyncio.run(process_keys(ingest, object_keys))
+    logger.info("batch complete", received=len(object_keys), processed=processed)
     return {"processed": processed}

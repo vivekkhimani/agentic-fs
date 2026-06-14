@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     def extraction_ladder_names(self) -> list[str]:
         return [name.strip() for name in self.extraction_ladder.split(",") if name.strip()]
 
+    # Level for the `afs_server` loggers (INFO surfaces extraction declines,
+    # escalation, and per-document worker progress to CloudWatch). DEBUG to dig in,
+    # WARNING to quiet down.
+    log_level: str = "INFO"
+
     # --- auth ---
     # "dev" = a static local principal (NEVER for production); "oidc" = the OAuth
     # resource server (not yet implemented — fails closed until that slice lands).
