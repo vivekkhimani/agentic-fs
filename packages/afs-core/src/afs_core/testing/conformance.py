@@ -134,6 +134,17 @@ class CatalogStoreConformance:
         gone = await store.list_entries("a", "ns", include_deleted=True)
         assert all(e.path != "x.txt" for e in gone.items)
 
+    async def test_put_revives_a_tombstone(self, store: CatalogStore) -> None:
+        # The delete -> re-add round-trip the reconciler relies on (ADR 0011): a put
+        # over a tombstoned path brings the row back to life (deleted_at cleared,
+        # visible again). A BYO catalog that gets this wrong fails here.
+        await store.put_entry(make_entry("a", "ns", "r.txt"))
+        await store.delete_entry("a", "ns", "r.txt")  # soft
+        assert await store.get_entry("a", "ns", "r.txt") is None  # hidden while tombstoned
+        await store.put_entry(make_entry("a", "ns", "r.txt"))  # re-added → revive
+        revived = await store.get_entry("a", "ns", "r.txt")
+        assert revived is not None and revived.deleted_at is None
+
     async def test_extraction_state_and_status_index(self, store: CatalogStore) -> None:
         await store.put_entry(make_entry("a", "ns", "x.txt"))
         await store.set_extraction(

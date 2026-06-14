@@ -93,3 +93,28 @@ variable "log_level" {
   type        = string
   default     = "INFO"
 }
+
+# --- reconciler ---
+variable "reconcile_schedule" {
+  description = "EventBridge schedule for the catalog↔S3 reconciliation sweep."
+  type        = string
+  default     = "rate(1 hour)"
+}
+
+variable "reconcile_grace_seconds" {
+  description = "Don't tombstone an orphaned catalog row updated within this window (race guard)."
+  type        = number
+  default     = 900
+}
+
+variable "reconciler_memory_mb" {
+  description = "Reconciler memory (MB). It only lists S3 + scans the catalog, so it's light."
+  type        = number
+  default     = 512
+}
+
+variable "reconciler_timeout_seconds" {
+  description = "Reconciler timeout (seconds). Bounded by corpus size; a full sweep is cheap at small scale."
+  type        = number
+  default     = 300
+}

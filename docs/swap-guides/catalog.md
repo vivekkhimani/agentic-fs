@@ -37,9 +37,17 @@ Same three steps as any layer:
            return MyCatalog(...)
    ```
    The kit checks the load-bearing guarantees: tenant isolation, stable prefix
-   pagination, tombstone→hard-delete, atomic extraction state + sparse status
-   index, `tree_version` bump-on-write, find-by-checksum, and **atomic** scratch
-   quota.
+   pagination, tombstone→hard-delete, **tombstone→revive** (a re-`put` clears
+   `deleted_at`), atomic extraction state + sparse status index, `tree_version`
+   bump-on-write, find-by-checksum, and **atomic** scratch quota.
+
+> **Reconciliation is free.** The scheduled catalog↔S3 reconciler
+> ([ADR 0011](../decisions/0011-reconciliation.md)) is written against this
+> contract — `list_entries(include_deleted=True)`, soft `delete_entry`, the
+> tombstone→revive round-trip, `list_tenants`/`list_namespaces`. Pass the
+> conformance kit and your backend reconciles like the default; you don't write
+> your own. (Non-AWS deployments just call `afs_server.reconcile.reconcile()` from
+> their own scheduler.)
 3. **Register** an entry point and select it:
    ```toml
    [project.entry-points."afs.catalog_stores"]
