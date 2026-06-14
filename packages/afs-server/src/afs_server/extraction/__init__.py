@@ -14,6 +14,7 @@ from importlib.metadata import entry_points
 from afs_core.contracts import Normalizer
 from afs_server.extraction.docling import DoclingNormalizer
 from afs_server.extraction.docx import DocxNormalizer
+from afs_server.extraction.llm import LlmNormalizer
 from afs_server.extraction.pdf import PdfNormalizer
 from afs_server.extraction.pdftables import PdfTablesNormalizer
 from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline
@@ -39,6 +40,7 @@ _BUILTIN_NORMALIZERS = {
     "tesseract": TesseractNormalizer,
     "rapidocr": RapidOcrNormalizer,
     "docling": DoclingNormalizer,
+    "llm": LlmNormalizer,
 }
 
 # Default ladder (config, not code). The lightweight rungs are always available,

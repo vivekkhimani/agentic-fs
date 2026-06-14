@@ -100,7 +100,7 @@ it — so the system is demoable at every step (plan §15).
   have landed (async path **live-validated**: a scanned PDF degrades to
   `catalog_only` inline and the worker escalates it via Textract OCR). Next: the
   **reconciler**, and the **extraction-routing** upgrade — a Haystack pipeline
-  engine with structure-preserving + multimodal rungs (`textract_analyze` ✅, `llm`),
+  engine with structure-preserving + multimodal rungs (`textract_analyze` ✅, `llm` ✅),
   cascade/content-type/optional-LLM routing ([ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)).
   Then Drive's delta `changes.list` (L2) + SharePoint. *Exit:* a corrupt PDF lands
   `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
