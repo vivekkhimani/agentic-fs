@@ -1,14 +1,34 @@
 # syntax=docker/dockerfile:1.7
 #
-# agentic-fs extractor-worker image (ADR 0009). Separate from the lean serving
-# image (`Dockerfile`): this one carries the **docling** extra (heavy ML deps)
-# and runs as a standard AWS Lambda **event** handler — it's invoked by SQS, not
-# HTTP, so there's no web adapter.
+# agentic-fs extractor-worker image (ADR 0009). Parametric: the extraction rungs
+# are a build arg, so you package only what your ladder uses — and only the
+# system libraries those rungs need. The default is the lightweight, fully
+# capable set: `textract` (AWS-managed OCR — scanned PDFs, forms, handwriting —
+# with no local ML), on top of the always-on text_native/pdf/docx rungs.
+#
+# Opt into heavier, self-hosted rungs at build time. docling/rapidocr pull
+# OpenCV (and thus X11/GL system libs); docling also pre-bakes its ML models:
+#
+#   docker build -f Dockerfile.worker \
+#     --build-arg AFS_EXTRAS=textract,docling \
+#     --build-arg AFS_LADDER=text_native,pdf,docx,textract,docling .
+#
+# Separate from the lean serving image (`Dockerfile`): the worker runs as a
+# standard AWS Lambda **event** handler (SQS-driven), so there's no web adapter.
+
+# Comma-separated afs-server extras to install. Each maps to a rung; see
+# packages/afs-server/pyproject.toml [project.optional-dependencies].
+ARG AFS_EXTRAS="textract"
+# The ladder baked into the image's AFS_EXTRACTION_LADDER (a Lambda env var, so a
+# deploy can still override it). Keep it consistent with AFS_EXTRAS — a rung named
+# here whose extra isn't installed simply declines at runtime (falls through).
+ARG AFS_LADDER="text_native,pdf,docx,textract"
 
 # ---------------------------------------------------------------------------
-# Builder — resolve afs-server[docling] into a self-contained venv with uv.
+# Builder — resolve the chosen afs-server extras into a self-contained venv.
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim-bookworm AS builder
+ARG AFS_EXTRAS
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.13 /uv /uvx /usr/local/bin/
 
@@ -18,17 +38,21 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Dependency layer (manifests only → caches until the lockfile changes).
+# Dependency layer (manifests only → caches until the lockfile or AFS_EXTRAS change).
 COPY pyproject.toml uv.lock ./
 COPY packages/afs-core/pyproject.toml packages/afs-core/README.md ./packages/afs-core/
 COPY packages/afs-server/pyproject.toml packages/afs-server/README.md ./packages/afs-server/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-workspace --package afs-server --extra docling --extra textract
+    set -eux; \
+    flags=""; for e in $(echo "$AFS_EXTRAS" | tr ',' ' '); do flags="$flags --extra $e"; done; \
+    uv sync --frozen --no-dev --no-install-workspace --package afs-server $flags
 
 # Project layer — install the workspace packages themselves (built wheels).
 COPY packages/ ./packages/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-editable --package afs-server --extra docling --extra textract
+    set -eux; \
+    flags=""; for e in $(echo "$AFS_EXTRAS" | tr ',' ' '); do flags="$flags --extra $e"; done; \
+    uv sync --frozen --no-dev --no-editable --package afs-server $flags
 
 # ---------------------------------------------------------------------------
 # Runtime — AWS Lambda Python base (Runtime Interface Client + emulator built in).
@@ -36,26 +60,39 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # are ABI-compatible.
 # ---------------------------------------------------------------------------
 FROM public.ecr.aws/lambda/python:3.12 AS runtime
+ARG AFS_EXTRAS
+ARG AFS_LADDER
 
-# docling's table model imports OpenCV (opencv-python), whose shared objects need
-# X11/GL system libraries absent from the minimal Lambda base (libxcb.so.1, …).
-RUN dnf install -y mesa-libGL glib2 libX11 libXext libSM libXrender libxcb \
-    && dnf clean all && rm -rf /var/cache/dnf
+# Install ONLY the system libs the chosen extras need. docling/rapidocr import
+# OpenCV, whose shared objects need X11/GL libraries absent from the minimal
+# Lambda base (libxcb.so.1, …). The default (textract) needs none.
+RUN set -eux; \
+    case ",${AFS_EXTRAS}," in \
+      *,docling,*|*,rapidocr,*) \
+        dnf install -y mesa-libGL glib2 libX11 libXext libSM libXrender libxcb \
+          && dnf clean all && rm -rf /var/cache/dnf ;; \
+      *) echo "no extra system libs needed for extras: ${AFS_EXTRAS}" ;; \
+    esac
 
 # Put the resolved site-packages on the Lambda task root (it's on sys.path).
 COPY --from=builder /app/.venv/lib/python3.12/site-packages/ ${LAMBDA_TASK_ROOT}/
 
-ENV AFS_EXTRACTION_LADDER="text_native,pdf,docx,docling" \
-    # Pre-baked models live here (read by the normalizer via artifacts_path); HF
+ENV AFS_EXTRACTION_LADDER="${AFS_LADDER}" \
+    # Pre-baked models live here (read by the docling rung via artifacts_path); HF
     # caches point at the only writable dir (/tmp) as a fallback.
     DOCLING_ARTIFACTS_PATH="/opt/docling/models" \
     HF_HOME="/tmp/huggingface" \
     XDG_CACHE_HOME="/tmp/cache"
 
-# Pre-bake docling's models into the image so a cold start doesn't download
-# ~hundreds of MB from HuggingFace (and doesn't depend on HF being reachable).
-# Loaded offline via artifacts_path at runtime.
-RUN python -c "from pathlib import Path; from docling.utils.model_downloader import download_models; download_models(output_dir=Path('/opt/docling/models'))"
+# Pre-bake docling's models into the image ONLY when docling is in the build, so
+# a cold start doesn't download ~hundreds of MB from HuggingFace (and doesn't
+# depend on HF being reachable). Skipped entirely for the slim default.
+RUN set -eux; \
+    case ",${AFS_EXTRAS}," in \
+      *,docling,*) \
+        python -c "from pathlib import Path; from docling.utils.model_downloader import download_models; download_models(output_dir=Path('/opt/docling/models'))" ;; \
+      *) echo "skipping docling model pre-bake (docling not in extras)" ;; \
+    esac
 
 # afs_server.worker.handler(event, context) — the SQS/S3-event entrypoint.
 CMD ["afs_server.worker.handler"]

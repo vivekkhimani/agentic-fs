@@ -77,6 +77,34 @@ directly. More OCR engines (Tesseract, RapidOCR, PaddleOCR) follow the same
 pattern; pick permissively-licensed ones — avoid AGPL (PyMuPDF) and
 commercial-restricted (Surya/Marker) for bundled extras.
 
+## Packaging the worker (only what your ladder uses)
+
+The async extractor worker (`Dockerfile.worker`, ADR 0009) is **parametric**: the
+rungs — and the system libraries they need — are a build arg, so you ship only
+what you run. The default build is the lightweight, fully-capable set: `textract`
+(AWS-managed OCR — scans, forms, handwriting — no local ML), giving a ~700 MB
+image. Opt into heavier self-hosted rungs at build time:
+
+```bash
+# slim default (managed OCR): no torch, no OpenCV system libs
+docker build -f Dockerfile.worker -t afs-worker .
+
+# docling build: pulls torch + OpenCV (and its X11/GL libs) and pre-bakes the
+# ML models. Keep the ladder in sync so the rung is actually used.
+docker build -f Dockerfile.worker \
+  --build-arg AFS_EXTRAS=textract,docling \
+  --build-arg AFS_LADDER=text_native,pdf,docx,textract,docling \
+  -t afs-worker-docling .
+```
+
+`AFS_EXTRAS` maps to the pyproject extras; the Dockerfile installs each extra's
+system libs only when named (OpenCV/GL libs for `docling`/`rapidocr`; nothing for
+the default). A rung named in the ladder whose extra isn't installed **declines**
+at runtime (the ladder falls through; the doc lands `catalog_only`) rather than
+crashing the worker — so a ladder/extras mismatch degrades safely. Match the
+Terraform `extraction_ladder` (and bump `memory_mb`/`timeout_seconds`) to a
+docling build when you deploy one.
+
 Reference: `afs_server.extraction`, contract in `afs_core/contracts/normalize.py`,
 decisions in [`0006`](../decisions/0006-extraction-normalizer-contract.md)
 (contract) and [`0009`](../decisions/0009-async-extraction-pipeline.md) (sync vs async).

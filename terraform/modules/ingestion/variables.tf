@@ -44,21 +44,30 @@ variable "permissions_boundary_arn" {
 }
 
 variable "extraction_ladder" {
-  description = "AFS_EXTRACTION_LADDER for the worker — light rungs first, then OCR/heavy escalation."
+  description = <<-EOT
+    AFS_EXTRACTION_LADDER for the worker — light rungs first, then OCR escalation.
+    Default matches the slim default worker image (textract = AWS-managed OCR, no
+    local ML). If you build the image with --build-arg AFS_EXTRAS=...,docling,
+    add "docling" here too so the heavier rung is actually used.
+  EOT
   type        = string
-  default     = "text_native,pdf,docx,textract,docling"
+  default     = "text_native,pdf,docx,textract"
 }
 
 variable "memory_mb" {
-  description = "Worker memory (MB). Docling/torch is memory-hungry; CPU scales with memory on Lambda."
+  description = <<-EOT
+    Worker memory (MB). Sized for the slim default (textract = managed OCR, light
+    rasterization). Raise it for a docling/torch build — that's memory-hungry, and
+    CPU scales with memory on Lambda (e.g. 3008+ for docling).
+  EOT
   type        = number
-  default     = 3008
+  default     = 1024
 }
 
 variable "timeout_seconds" {
-  description = "Worker timeout (seconds). Cold start pulls a large image + downloads models on first run."
+  description = "Worker timeout (seconds). Raise it for a docling build (heavier cold start + per-doc ML inference)."
   type        = number
-  default     = 300
+  default     = 120
 }
 
 variable "batch_size" {

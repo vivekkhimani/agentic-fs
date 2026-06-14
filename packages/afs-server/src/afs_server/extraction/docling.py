@@ -71,10 +71,17 @@ class DoclingNormalizer:
         if self._converter is None:
             try:
                 from docling.document_converter import DocumentConverter
-            except ModuleNotFoundError as err:  # pragma: no cover - import guard
-                raise RuntimeError(
-                    "the 'docling' extraction rung requires the optional dependency; "
-                    "install it with `pip install afs-server[docling]`"
+            except ModuleNotFoundError as err:  # rung named but its extra isn't installed
+                # Decline (not crash): the ladder falls through to the next rung,
+                # and a doc no rung can read lands catalog_only — never a poison
+                # message. Loud so a real misconfig is visible in the logs.
+                logger.warning(
+                    "docling rung named in the ladder but afs-server[docling] is not "
+                    "installed — declining; install the extra or drop 'docling' from "
+                    "AFS_EXTRACTION_LADDER"
+                )
+                raise NormalizationError(
+                    "missing_dependency", "afs-server[docling] is not installed"
                 ) from err
             # Load pre-baked models from DOCLING_ARTIFACTS_PATH (set in the worker
             # image) so cold starts don't download from HF. Pass artifacts_path
