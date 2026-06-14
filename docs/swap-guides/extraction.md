@@ -66,6 +66,7 @@ names, so the image stays as light as your pipeline:
 | `tesseract` | `[tesseract]` (+ the tesseract binary) | lightweight self-hosted OCR — clean printed scans, no data leaves |
 | `rapidocr` | `[rapidocr]` (onnxruntime+opencv) | PaddleOCR-quality OCR on ONNX (no torch) — better self-hosted recognition, still light |
 | `docling` | `[docling]` (heavy ML) | born-digital PDFs with complex layout/tables |
+| `llm` | `[anthropic]` *or* `[openai]` | **batteries-included multimodal** — one vision call per page (Claude/OpenAI); preserves tables **and describes diagrams/charts inline**. Most capable, most expensive. `AFS_LLM_PROVIDER` / `AFS_LLM_MODEL`; reads the SDK's API-key env var |
 
 ```bash
 pip install "afs-server[textract]"
