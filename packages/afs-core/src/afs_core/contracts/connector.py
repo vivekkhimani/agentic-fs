@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Protocol, runtime_checkable
 
-from afs_core.models import SourceItem
+from afs_core.models import ChangeSet, SourceItem
 
 
 @runtime_checkable
@@ -31,4 +31,23 @@ class Connector(Protocol):
 
     def fetch(self, item: SourceItem) -> bytes:
         """Return the raw bytes for one discovered item."""
+        ...
+
+
+@runtime_checkable
+class IncrementalConnector(Protocol):
+    """A connector whose source has a native delta feed (Drive ``changes.list``,
+    Graph ``delta``). The engine uses ``discover_changes`` to enumerate *only*
+    what changed since the last cursor — see [ADR 0008]. It is a superset of
+    `Connector`: ``discover``/``fetch`` remain for the first/forced full scan.
+    """
+
+    name: str
+
+    def discover(self) -> Iterable[SourceItem]: ...
+
+    def fetch(self, item: SourceItem) -> bytes: ...
+
+    def discover_changes(self, cursor: str | None) -> ChangeSet:
+        """Return changes since ``cursor`` (everything + a start cursor if None)."""
         ...

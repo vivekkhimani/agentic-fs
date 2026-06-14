@@ -8,7 +8,7 @@ S3 keys or the catalog — exactly like a `Normalizer` never speaks to storage.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SourceItem(BaseModel):
@@ -26,3 +26,17 @@ class SourceItem(BaseModel):
     size: int | None = None
     content_type: str | None = None
     version: str | None = None
+
+
+class ChangeSet(BaseModel):
+    """An incremental discovery's result — what changed since a cursor (plan §8).
+
+    ``items`` are created/updated documents to ingest; ``deleted`` are source
+    paths removed since the cursor (the engine tombstones them); ``cursor`` is
+    the new opaque token to persist for the next run. On a first sync the
+    connector returns everything plus a starting cursor.
+    """
+
+    items: list[SourceItem] = Field(default_factory=list)
+    deleted: list[str] = Field(default_factory=list)
+    cursor: str

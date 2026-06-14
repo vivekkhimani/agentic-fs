@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import httpx
 
 from afs_connector_sdk.client import IngestClient
@@ -72,3 +74,52 @@ async def test_no_auth_adds_no_authorization_header() -> None:
     await client.delete_document("ns", "a.md")
     await client.aclose()
     assert seen["auth"] is None
+
+
+async def test_put_document_sends_provenance_headers() -> None:
+    seen: dict[str, str | None] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["cid"] = request.headers.get("x-afs-connector-id")
+        seen["rid"] = request.headers.get("x-afs-remote-id")
+        seen["ver"] = request.headers.get("x-afs-source-version")
+        return httpx.Response(201, json={"checksum": "x"})
+
+    client = _client_with(handler)
+    await client.put_document(
+        "ns", "a.md", b"hi", connector_id="local", remote_id="/abs/a.md", source_version="v1"
+    )
+    await client.aclose()
+    assert (seen["cid"], seen["rid"], seen["ver"]) == ("local", "/abs/a.md", "v1")
+
+
+async def test_get_checkpoint_handles_null_and_value() -> None:
+    # The server returns JSON `null` when no checkpoint exists.
+    null_client = _client_with(
+        lambda req: httpx.Response(
+            200, content=b"null", headers={"content-type": "application/json"}
+        )
+    )
+    assert await null_client.get_checkpoint("local") is None
+    await null_client.aclose()
+
+    val_client = _client_with(
+        lambda req: httpx.Response(200, json={"connector_id": "local", "cursor": "c7"})
+    )
+    assert await val_client.get_checkpoint("local") == "c7"
+    await val_client.aclose()
+
+
+async def test_put_checkpoint_posts_cursor() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(204)
+
+    client = _client_with(handler)
+    await client.put_checkpoint("local", "c9")
+    await client.aclose()
+    assert str(seen["url"]).endswith("/v1/connectors/local/checkpoint")
+    assert seen["body"] == {"connector_id": "local", "cursor": "c9"}

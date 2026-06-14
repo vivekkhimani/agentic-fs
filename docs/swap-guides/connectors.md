@@ -31,6 +31,30 @@ class Connector(Protocol):
   `RequestSigner` the SDK supplies: `NoAuth`, `SigV4Signer` (the `AWS_IAM`
   Function URL), bearer later. You don't write this.
 
+## Incremental sync (don't re-crawl everything)
+
+For periodic syncs of large sources, the engine avoids redundant work in two
+layers ([ADR 0008](../decisions/0008-incremental-sync.md)):
+
+- **L1 (automatic, every connector).** The engine stamps each ingest with your
+  `SourceItem.version` (etag/mtime) and, next run, **skips the fetch** for any
+  file whose version is unchanged. You get this for free by populating `version`.
+- **L2 (opt-in, delta sources).** If your source has a change feed, implement
+  `IncrementalConnector.discover_changes(cursor) -> ChangeSet` (changed items +
+  deleted paths + a new cursor). The engine persists the cursor server-side and
+  next run enumerates only what changed — it never lists the unchanged tree.
+
+```python
+class IncrementalConnector(Protocol):
+    name: str
+    def discover(self) -> Iterable[SourceItem]          # full / first scan
+    def fetch(self, item: SourceItem) -> bytes
+    def discover_changes(self, cursor: str | None) -> ChangeSet   # cursor=None ⇒ everything + a start cursor
+```
+
+Local FS and S3 ship L1 today; Google Drive / SharePoint are the first L2
+connectors (Drive's `changes.list`, Graph `delta`).
+
 ## Write one
 
 1. **Implement** the `Connector` Protocol (wrap boto3, the Google API client, a

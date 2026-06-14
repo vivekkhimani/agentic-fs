@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 from afs_core import keys
 from afs_core.errors import NamespaceNotFoundError
-from afs_core.models import CatalogEntry, ExtractionState, SourceDocument
+from afs_core.models import CatalogEntry, ExtractionState, SourceDocument, SourceRef
 
 if TYPE_CHECKING:
     from afs_core.contracts import CatalogStore, ObjectStore
@@ -106,6 +106,7 @@ class IngestService:
         *,
         content_type: str | None = None,
         title: str | None = None,
+        source: SourceRef | None = None,
     ) -> CatalogEntry:
         self._authorize(ctx, namespace)
         keys.validate_relpath(path)
@@ -134,6 +135,7 @@ class IngestService:
             content_type=content_type,
             title=title or path.rsplit("/", 1)[-1],
             extraction=extraction,
+            source=source,
             created_at=created_at,
             updated_at=now,
         )

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request, Response, status
+from fastapi import APIRouter, Header, Query, Request, Response, status
 
-from afs_core.models import CatalogEntry
+from afs_core.models import CatalogEntry, SourceRef
 from afs_server.dependencies import IngestDep, PrincipalDep
 
 router = APIRouter(prefix="/v1/ingest", tags=["ingest"])
@@ -19,11 +19,29 @@ async def put_doc(
     ingest: IngestDep,
     principal: PrincipalDep,
     path: Annotated[str, Query()],
+    connector_id: Annotated[str | None, Header(alias="X-Afs-Connector-Id")] = None,
+    remote_id: Annotated[str | None, Header(alias="X-Afs-Remote-Id")] = None,
+    source_version: Annotated[str | None, Header(alias="X-Afs-Source-Version")] = None,
 ) -> CatalogEntry:
-    """Upload a document's bytes directly. Text-native files become readable at once."""
+    """Upload a document's bytes directly. Text-native files become readable at once.
+
+    A connector may stamp provenance via ``X-Afs-Connector-Id`` / ``-Remote-Id`` /
+    ``-Source-Version`` headers; the version is what lets a later sync skip the
+    fetch when nothing changed (ADR 0008).
+    """
     data = await request.body()
+    source = (
+        SourceRef(connector_id=connector_id, remote_id=remote_id or path, version=source_version)
+        if connector_id
+        else None
+    )
     return await ingest.put_document(
-        principal, namespace, path, data, content_type=request.headers.get("content-type")
+        principal,
+        namespace,
+        path,
+        data,
+        content_type=request.headers.get("content-type"),
+        source=source,
     )
 
 
