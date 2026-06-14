@@ -77,7 +77,8 @@ Status against each:
 | Ingest → extract → heal | `ingestion` ✅ | **Hybrid extraction** (ADR 0009): serving extracts common files **inline** (light `text_native,pdf,docx` ladder, instant) while the **S3-event worker** OCR-escalates the rest — EventBridge → SQS (+DLQ) → worker Lambda. The worker image is **parametric** (`Dockerfile.worker`, `AFS_EXTRAS` build arg): the slim default runs `text_native,pdf,docx,textract` (~700 MB, managed OCR, no torch); `docling` is an opt-in heavy build. A rung named without its extra declines safely. Skips rows already extracted inline. **Structured logging** (structlog → JSON in CloudWatch, console in dev; `AFS_LOG_LEVEL`) surfaces declines/escalation/per-doc progress; the **DLQ** is locked to the extract queue with a redrive-allow policy (move-back after a fix). The scheduled **reconciler** ([ADR 0011](decisions/0011-reconciliation.md), EventBridge rate → Lambda) heals catalog↔S3 drift: missing/stale/re-added objects are enqueued for the worker, orphaned rows are **soft-deleted** (tombstones revive if the file returns) ✅. CloudWatch **alarms** are the remaining piece |
 | Connectors (source → ingest) | `afs-connector-sdk` | 🔧 local + S3 + Drive | **Point it at your documents** — client-side crawlers push to the ingest API, with **incremental sync** (version-skip + delta cursors, [ADR 0008](decisions/0008-incremental-sync.md)) so big sources aren't re-crawled wholesale. Local FS / S3 / **Google Drive** (OAuth + export) ship; Drive's delta `changes.list` + SharePoint are next |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
-| OAuth IdP (optional) | `auth_cognito` | M1/opt | OAuth 2.1 resource server, batteries-included, $0 under free tier |
+| Auth — OAuth 2.1 **resource server** (core) | afs-server (`auth_mode=oidc`) | M4 🔜 | **Bring your own IdP** — we validate tokens + map claims, never issue them ([ADR 0013](decisions/0013-auth-oauth-resource-server.md)); works with WorkOS/Cognito/Auth0/Okta/Keycloak |
+| Auth — IdP (optional, greenfield only) | `auth_cognito` | opt | Batteries-included user pool for users with no IdP, $0 under free tier — never required |
 | Read/grep cache (optional) | `cache_elasticache` (Redis/Valkey) | opt | **Latency accelerator you switch on** — caches derived-text reads + grep prefetch (the ChromaFs Redis layer); off by default to keep ~$2/mo idle |
 | Malware gate, audit, alarms | `security_guardduty`, `observability` | opt | Enterprise hardening — none of it bolted on later |
 
@@ -141,8 +142,24 @@ it — so the system is demoable at every step (plan §15).
   oversized results are rejected with a "narrow your query" error, not truncated)
   rounds out the middleware so even a cap-less plugin tool stays inside the
   context window ✅. *Exit:* an agent greps a 1k-file corpus under budget — met by
-  the bounded two-stage grep + the middleware net. The live MCP-surface dry-run is
-  the remaining validation.
+  the bounded two-stage grep + the middleware net. **Validated end-to-end** by a
+  live MCP-surface dry-run (discover → glob → grep → ranged read → scratch CRUD →
+  budget rejection) against real MinIO + DynamoDB Local ✅.
+- **M4 — Auth: IdP-agnostic OAuth 2.1 resource server** 🔜 ([ADR 0013](decisions/0013-auth-oauth-resource-server.md))
+  — replace dev-auth with real token validation. **Bring your own IdP**: we
+  validate tokens + map claims, never issue them. Stateless by choice — **scopes
+  trusted from the token**, **namespaces from a token claim** (no grant store).
+  Token validation + Protected Resource Metadata delegated to FastMCP
+  (`RemoteAuthProvider`/`JWTVerifier`); the same verifier backs a FastAPI bearer
+  dep so REST + MCP share one path. *Slices:* ① ADR ✅ → ② core verifier +
+  claims→`TenantContext` (RSA-keypair unit tests, no live IdP) → ③ wire both
+  surfaces + request-aware `resolve_context` (M3 enforcement goes live) → ④
+  optional `auth_cognito` module + per-IdP swap-guide. **DX multipliers (queued):**
+  `afs auth doctor` (paste a token → see claims + resolved context), auto-served
+  PRM (MCP clients need zero auth code), per-IdP recipe pages (WorkOS/Cognito/
+  Auth0/Okta/Keycloak), and a `static-jwt` local mode (full path, no IdP).
+  *Exit:* authenticated end-to-end against **seamind-learn's WorkOS** issuer
+  (real external IdP), with tenant isolation + scope denial verified live.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
   `compute_fargate`/`network`, `observability`, `security_guardduty`,
   `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));
