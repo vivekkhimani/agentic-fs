@@ -152,9 +152,11 @@ it — so the system is demoable at every step (plan §15).
   Token validation + Protected Resource Metadata delegated to FastMCP
   (`RemoteAuthProvider`/`JWTVerifier`); the same verifier backs a FastAPI bearer
   dep so REST + MCP share one path. *Slices:* ① ADR ✅ → ② core verifier +
-  claims→`TenantContext` (RSA-keypair unit tests, no live IdP) → ③ wire both
-  surfaces + request-aware `resolve_context` (M3 enforcement goes live) → ④
-  optional `auth_cognito` module + per-IdP swap-guide. **DX multipliers (queued):**
+  claims→`TenantContext` ✅ (`build_token_verifier` + `context_from_claims`,
+  13 RSA-keypair tests, no live IdP) → ③ wire both surfaces + request-aware
+  `resolve_context` (M3 enforcement goes live) → ④ `auth_cognito` is **deferred,
+  greenfield-only** (not core; `static-jwt` mode + recipes cover the no-IdP gap).
+  **DX multipliers (queued):**
   `afs auth doctor` (paste a token → see claims + resolved context), auto-served
   PRM (MCP clients need zero auth code), per-IdP recipe pages (WorkOS/Cognito/
   Auth0/Okta/Keycloak), and a `static-jwt` local mode (full path, no IdP).

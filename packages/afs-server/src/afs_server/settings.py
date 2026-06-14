@@ -83,10 +83,35 @@ class Settings(BaseSettings):
 
     # --- auth ---
     # "dev" = a static local principal (NEVER for production); "oidc" = the OAuth
-    # resource server (not yet implemented — fails closed until that slice lands).
+    # 2.1 resource server (ADR 0013) — validate bearer JWTs from your own IdP.
     auth_mode: str = "dev"
     dev_tenant_id: str = "dev"
     dev_principal_id: str = "dev"
+
+    # --- auth: OIDC resource server (ADR 0013, when auth_mode="oidc") ---
+    # We validate tokens against your IdP's keys; we never issue them ("bring your
+    # own IdP"). Supply a JWKS URI (production) or a static PEM public key (the
+    # offline "static-jwt" mode, also what the unit tests mint against). `issuer`
+    # and `audience` (RFC 8707 resource binding) are validated when set.
+    oidc_issuer: str | None = None
+    oidc_jwks_uri: str | None = None
+    oidc_audience: str | None = None
+    oidc_algorithm: str = "RS256"
+    oidc_public_key: str | None = None  # static-jwt mode (PEM)
+    # Claim → TenantContext mapping. Defaults fit the common case; override the
+    # names that differ per IdP (e.g. WorkOS tenant=org_id, Cognito=custom:tenant_id).
+    # Scopes are TRUSTED FROM THE TOKEN (no role mapping). An absent tenant claim
+    # falls back to oidc_default_tenant.
+    oidc_principal_claim: str = "sub"
+    oidc_tenant_claim: str = "tenant_id"
+    oidc_default_tenant: str | None = None
+    oidc_scopes_claim: str = "scope"
+    # Namespaces are the data boundary, so an absent namespaces claim FAILS SAFE
+    # (deny all). Set this to opt a deployment into a default when the claim is
+    # absent: "*" = tenant-wide (single-tenant convenience), or a comma/space list
+    # of namespaces. The claim itself may also be "*" to grant tenant-wide per token.
+    oidc_namespaces_claim: str = "afs_namespaces"
+    oidc_default_namespaces: str | None = None
 
 
 def load_settings() -> Settings:

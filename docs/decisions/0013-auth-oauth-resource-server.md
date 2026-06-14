@@ -54,12 +54,17 @@ Stateless and flat — both forks resolved toward "pure OAuth, no state we manag
   developer registers these scopes in their IdP's API/resource config (recipes
   provided). *(Rejected: mapping IdP roles/groups → scopes — defers to a future
   optional mapper if demand appears.)*
-- **Namespaces: from a token claim.** `TenantContext.namespaces` comes from a
-  configurable claim (default `afs_namespaces`). Stateless, no grant store, and an
-  external org controls access entirely in its own IdP. *(Rejected: a
-  catalog-managed grant store + admin API — more control, but a stateful concern
-  to heal/secure and an admin surface we'd own; revisit only if a deployment needs
-  central grant management.)*
+- **Namespaces: from a token claim, fail-safe.** `TenantContext.namespaces` comes
+  from a configurable claim (default `afs_namespaces`). Stateless, no grant store,
+  and an external org controls access entirely in its own IdP. Namespaces are the
+  *data* boundary (scopes are only the capability gate), so an **absent claim
+  denies all namespaces** — a deployment opts into a default via
+  `AFS_OIDC_DEFAULT_NAMESPACES` (`*` = tenant-wide for single-tenant convenience,
+  or a list); the claim itself may be `*` to grant tenant-wide per token. Secure
+  misconfiguration over silent over-grant. *(Rejected: a catalog-managed grant
+  store + admin API — more control, but a stateful concern to heal/secure and an
+  admin surface we'd own; revisit only if a deployment needs central grant
+  management.)*
 - **Principal/tenant** from configurable claims: `sub` → `principal_id` (default);
   a configurable tenant claim (`AFS_OIDC_TENANT_CLAIM`, e.g. WorkOS `org_id`,
   Cognito `custom:tenant_id`) → `tenant_id`.
