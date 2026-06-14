@@ -37,6 +37,7 @@ def get_ingest_service(request: Request) -> IngestService:
         request.app.state.catalog,
         request.app.state.objects,
         request.app.state.extraction_pipeline,
+        extraction_mode=request.app.state.settings.extraction_mode,
     )
 
 

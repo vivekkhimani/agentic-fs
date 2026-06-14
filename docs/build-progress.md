@@ -72,7 +72,7 @@ Status against each:
 | Encryption / tenancy floor | `kms` | ✅ done | **Multi-tenant, enterprise-secure by default** — SSE-KMS on every object |
 | Catalog (list/glob/stat index) | `catalog_dynamodb` (default) / `catalog_postgres` | ✅ done | The **derived index** of S3 — navigation without O(corpus) S3 LISTs; healable; **swappable** |
 | Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | ✅ done (live) | **MCP-first, agent-shaped** — streaming Function URL (AWS_IAM); OAuth resource server + enforcement boundary still to come |
-| Ingest → extract → heal | `ingestion` | 🔧 write path done (live) | **In-request** `PUT`→extract→catalog works end-to-end (`text_native` + `docling` rungs); the **async S3-event pipeline** (EventBridge → SQS → worker) + reconciler are the next slice |
+| Ingest → extract → heal | `ingestion` | 🔧 write path live; async worker app-side | **In-request** `PUT`→extract→catalog works (`text_native`); the **async S3-event** worker + two-mode ingest (`AFS_EXTRACTION_MODE`, [ADR 0009](decisions/0009-async-extraction-pipeline.md)) are built app-side — the Terraform `ingestion` module (EventBridge → SQS → worker Lambda w/ `docling`) + reconciler are next |
 | Connectors (source → ingest) | `afs-connector-sdk` | 🔧 local + S3 + Drive | **Point it at your documents** — client-side crawlers push to the ingest API, with **incremental sync** (version-skip + delta cursors, [ADR 0008](decisions/0008-incremental-sync.md)) so big sources aren't re-crawled wholesale. Local FS / S3 / **Google Drive** (OAuth + export) ship; Drive's delta `changes.list` + SharePoint are next |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
 | OAuth IdP (optional) | `auth_cognito` | M1/opt | OAuth 2.1 resource server, batteries-included, $0 under free tier |
@@ -94,10 +94,11 @@ it — so the system is demoable at every step (plan §15).
   **`docling` rung** (PDF/Office/images), the **connector SDK** (`fs-crawler`,
   Local FS + S3 + **Google Drive** with OAuth + native-doc export), and
   **incremental sync** (version-skip + delta cursors + server-side checkpoints,
-  [ADR 0008](decisions/0008-incremental-sync.md)) have landed. Next: the **async
-  pipeline** (EventBridge → SQS → extractor worker so heavy parsers don't block the
-  request, and where `docling` runs in production), Drive's delta `changes.list`
-  (L2) + SharePoint, and the reconciler. *Exit:* a corrupt PDF lands `catalog_only` and is still
+  [ADR 0008](decisions/0008-incremental-sync.md)), and the **async extraction
+  worker** + two-mode ingest (app-side, [ADR 0009](decisions/0009-async-extraction-pipeline.md))
+  have landed. Next: the Terraform **`ingestion` module** (EventBridge → SQS →
+  worker Lambda with `docling`) to deploy that worker live, Drive's delta
+  `changes.list` (L2) + SharePoint, and the reconciler. *Exit:* a corrupt PDF lands `catalog_only` and is still
   cite-able; a hand-deleted catalog row heals.
 - **M3 — Grep, scratch, budgets** — two-stage budgeted grep, scratch namespace,
   full MCP middleware (visibility, per-call enforcement, audit). *Exit:* an agent
