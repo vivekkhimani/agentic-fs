@@ -102,6 +102,8 @@ it — so the system is demoable at every step (plan §15).
   **reconciler**, and the **extraction-routing** upgrade — a Haystack pipeline
   engine with structure-preserving + multimodal rungs (`textract_analyze` ✅, `llm` ✅),
   cascade/content-type/optional-LLM routing ([ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)).
+  The quality gate now escalates on **confidence** (`AFS_MIN_CONFIDENCE`) as well as
+  char count ✅ — shaky OCR can fall through to a stronger rung.
   Then Drive's delta `changes.list` (L2) + SharePoint. *Exit:* a corrupt PDF lands
   `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
   - **Backlog (post-engine):** ship a set of **pre-packaged Haystack pipeline

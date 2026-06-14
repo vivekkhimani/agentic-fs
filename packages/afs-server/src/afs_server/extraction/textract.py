@@ -48,10 +48,13 @@ class TextractNormalizer:
         )
 
         pages: list[PageText] = []
+        confidences: list[float] = []
         for index, image in enumerate(page_images):
-            text = self._ocr(image)
+            text, confidence = self._ocr(image)
             if not text.strip():
                 continue  # blank page; keep numbering contiguous
+            if confidence is not None:
+                confidences.append(confidence)
             pages.append(
                 PageText(
                     number=len(pages) + 1,
@@ -70,16 +73,17 @@ class TextractNormalizer:
                 char_count=sum(char_counts),
                 ocr_used=True,
                 min_chars_per_page=min(char_counts),
+                confidence=min(confidences) if confidences else None,
             ),
         )
 
-    def _ocr(self, image_bytes: bytes) -> str:
+    def _ocr(self, image_bytes: bytes) -> tuple[str, float | None]:
         resp = self._textract().detect_document_text(Document={"Bytes": image_bytes})
-        return "\n".join(
-            block.get("Text", "")
-            for block in resp.get("Blocks", [])
-            if block.get("BlockType") == "LINE"
-        )
+        lines = [b for b in resp.get("Blocks", []) if b.get("BlockType") == "LINE"]
+        text = "\n".join(b.get("Text", "") for b in lines)
+        scores = [b["Confidence"] for b in lines if "Confidence" in b]
+        confidence = (sum(scores) / len(scores) / 100.0) if scores else None
+        return text, confidence
 
     def _textract(self) -> Any:
         if self._client is None:

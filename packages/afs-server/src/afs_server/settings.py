@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # afs-server[docling]).
     extraction_ladder: str = "text_native,pdf,docx"
 
+    # Escalate a result whose reported confidence (0..1, e.g. OCR) is below this to
+    # the next ladder rung. 0.0 (default) never gates on confidence; e.g. 0.6 sends
+    # shaky Textract OCR on to a stronger rung (llm).
+    extraction_min_confidence: float = 0.0
+
     @property
     def extraction_ladder_names(self) -> list[str]:
         return [name.strip() for name in self.extraction_ladder.split(",") if name.strip()]

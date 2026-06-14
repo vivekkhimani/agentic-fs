@@ -51,6 +51,13 @@ document and produces an above-quality-gate result wins. A low-quality result
 the lightweight rungs handle the common case and **`docling` escalates** for what
 they can't (scans, complex tables/layout).
 
+The gate has two signals. **Char count** (`min_chars_per_page`) catches "got
+(almost) no text" — a scan falls through to OCR. **Confidence** (`AFS_MIN_CONFIDENCE`,
+0..1, default `0.0` = off) catches "OCR'd it but wasn't sure": a rung that reports
+confidence (the Textract rungs do, from per-line scores) and lands below the
+threshold escalates to the next rung — e.g. set `0.6` to send shaky OCR on to the
+`llm` rung. A rung that doesn't report confidence is never gated on it.
+
 **Lightweight builtins (always on, no ML):** `text_native`, `pdf` (pypdfium2 text
 layer), `docx` (python-docx). Common files extract **synchronously, in-request** —
 the default ladder is `text_native,pdf,docx`.

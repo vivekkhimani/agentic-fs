@@ -78,7 +78,9 @@ def handler(event: dict[str, Any], context: object = None) -> dict[str, Any]:
     ingest = IngestService(
         get_catalog_store(settings),
         get_object_store(settings),
-        build_pipeline(settings.extraction_ladder_names),
+        build_pipeline(
+            settings.extraction_ladder_names, min_confidence=settings.extraction_min_confidence
+        ),
     )
     processed = asyncio.run(process_keys(ingest, object_keys))
     logger.info("batch complete", received=len(object_keys), processed=processed)
