@@ -52,8 +52,8 @@ class IncrementalConnector(Protocol):
     def discover_changes(self, cursor: str | None) -> ChangeSet   # cursor=None ⇒ everything + a start cursor
 ```
 
-Local FS and S3 ship L1 today; Google Drive / SharePoint are the first L2
-connectors (Drive's `changes.list`, Graph `delta`).
+Local FS, S3, and Google Drive ship L1 today; Drive's delta `changes.list` (and
+Graph `delta` for SharePoint) are the first L2 implementations, next up.
 
 ## Write one
 
@@ -78,7 +78,8 @@ connectors (Drive's `changes.list`, Graph `delta`).
 
 ## Builtins + the CLI
 
-`local` (a directory) and `s3` (`s3://bucket/prefix/`, needs the `[aws]` extra).
+`local` (a directory), `s3` (`s3://bucket/prefix/`, needs `[aws]`), and `gdrive`
+(a Drive folder, needs `[gdrive]` — see [its setup guide](../connectors/gdrive.md)).
 Re-runs are idempotent (skip unchanged by checksum); `--prune` mirrors deletes.
 
 ```bash
