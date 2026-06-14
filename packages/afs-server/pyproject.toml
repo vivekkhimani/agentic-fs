@@ -34,7 +34,9 @@ dependencies = [
 [project.optional-dependencies]
 # Rich extraction (PDF / Office / images) via Docling — pulls heavy ML deps, so
 # it's opt-in. Enable the rung with AFS_EXTRACTION_LADDER=text_native,docling.
-docling = ["docling>=2"]
+# torch/torchvision are listed explicitly (they're docling transitives) so the
+# CPU-wheel pin in [tool.uv.sources] applies — see the root pyproject.
+docling = ["docling>=2", "torch", "torchvision"]
 # Reserved for future backends. Intentionally empty until the dependencies
 # exist — declaring the names now keeps the install surface stable.
 # TODO: add the Postgres catalog backend deps when that store lands.
@@ -56,3 +58,6 @@ packages = ["src/afs_server"]
 
 [tool.uv.sources]
 afs-core = { workspace = true }
+# CPU-only torch (no CUDA) — the index is declared in the root pyproject.
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
