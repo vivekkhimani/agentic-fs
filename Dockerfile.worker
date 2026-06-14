@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1.7
+#
+# agentic-fs extractor-worker image (ADR 0009). Separate from the lean serving
+# image (`Dockerfile`): this one carries the **docling** extra (heavy ML deps)
+# and runs as a standard AWS Lambda **event** handler — it's invoked by SQS, not
+# HTTP, so there's no web adapter.
+
+# ---------------------------------------------------------------------------
+# Builder — resolve afs-server[docling] into a self-contained venv with uv.
+# ---------------------------------------------------------------------------
+FROM python:3.12-slim-bookworm AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.9.13 /uv /uvx /usr/local/bin/
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+WORKDIR /app
+
+# Dependency layer (manifests only → caches until the lockfile changes).
+COPY pyproject.toml uv.lock ./
+COPY packages/afs-core/pyproject.toml packages/afs-core/README.md ./packages/afs-core/
+COPY packages/afs-server/pyproject.toml packages/afs-server/README.md ./packages/afs-server/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-workspace --package afs-server --extra docling
+
+# Project layer — install the workspace packages themselves (built wheels).
+COPY packages/ ./packages/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-editable --package afs-server --extra docling
+
+# ---------------------------------------------------------------------------
+# Runtime — AWS Lambda Python base (Runtime Interface Client + emulator built in).
+# The base is python 3.12 like the builder, so the installed wheels (manylinux)
+# are ABI-compatible.
+# ---------------------------------------------------------------------------
+FROM public.ecr.aws/lambda/python:3.12 AS runtime
+
+# Put the resolved site-packages on the Lambda task root (it's on sys.path).
+COPY --from=builder /app/.venv/lib/python3.12/site-packages/ ${LAMBDA_TASK_ROOT}/
+
+ENV AFS_EXTRACTION_LADDER="text_native,docling" \
+    # Lambda's only writable dir is /tmp — point model/HF caches there so docling
+    # can fetch its models at runtime. (Pre-baking models is a later optimization.)
+    HF_HOME="/tmp/huggingface" \
+    XDG_CACHE_HOME="/tmp/cache"
+
+# afs_server.worker.handler(event, context) — the SQS/S3-event entrypoint.
+CMD ["afs_server.worker.handler"]

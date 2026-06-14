@@ -6,6 +6,7 @@ on:
     paths:
       - 'packages/**'
       - 'Dockerfile'
+      - 'Dockerfile.worker'
       - '.dockerignore'
       - '.github/workflows/image.yml'
   workflow_dispatch: {}
@@ -61,4 +62,51 @@ jobs:
           else
             echo "Lambda $IMAGE_NAME not created yet — image pushed only."
             echo "Create it with: terraform apply -var enable_compute=true -var image_tag=${GITHUB_SHA::12}"
+          fi
+
+  # The extractor-worker image (afs-server[docling]). Separate job so the heavy
+  # ML build runs in parallel and never blocks the serving deploy. Same ECR repo,
+  # a `worker-` tag (the repo enforces immutable tags). Rolls agentic-fs-worker
+  # once the ingestion module has created it (ADR 0009).
+  build-push-worker:
+    runs-on: ubuntu-latest
+    environment: sandbox
+    env:
+      WORKER_NAME: agentic-fs-worker
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/agentic-fs-ci-image-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
+
+      - name: Build and push the worker image
+        id: build
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          IMAGE="${REGISTRY}/${IMAGE_NAME}:worker-${GITHUB_SHA::12}"
+          docker build --platform linux/amd64 -f Dockerfile.worker -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "Pushed $IMAGE"
+
+      - name: Roll the worker Lambda to the new image (if it exists)
+        env:
+          IMAGE: ${{ steps.build.outputs.image }}
+        run: |
+          set -euo pipefail
+          if aws lambda get-function --function-name "$WORKER_NAME" >/dev/null 2>&1; then
+            aws lambda update-function-code \
+              --function-name "$WORKER_NAME" --image-uri "$IMAGE" --publish >/dev/null
+            echo "Rolled $WORKER_NAME to $IMAGE"
+          else
+            echo "Lambda $WORKER_NAME not created yet — image pushed only (create via the ingestion module)."
           fi
