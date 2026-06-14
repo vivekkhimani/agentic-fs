@@ -78,6 +78,7 @@ Status against each:
 | Connectors (source → ingest) | `afs-connector-sdk` | 🔧 local + S3 + Drive | **Point it at your documents** — client-side crawlers push to the ingest API, with **incremental sync** (version-skip + delta cursors, [ADR 0008](decisions/0008-incremental-sync.md)) so big sources aren't re-crawled wholesale. Local FS / S3 / **Google Drive** (OAuth + export) ship; Drive's delta `changes.list` + SharePoint are next |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
 | OAuth IdP (optional) | `auth_cognito` | M1/opt | OAuth 2.1 resource server, batteries-included, $0 under free tier |
+| Read/grep cache (optional) | `cache_elasticache` (Redis/Valkey) | opt | **Latency accelerator you switch on** — caches derived-text reads + grep prefetch (the ChromaFs Redis layer); off by default to keep ~$2/mo idle |
 | Malware gate, audit, alarms | `security_guardduty`, `observability` | opt | Enterprise hardening — none of it bolted on later |
 
 ## Milestone roadmap
@@ -127,12 +128,17 @@ it — so the system is demoable at every step (plan §15).
     (above). What's left is **bundled example pipeline YAMLs** to copy/customize,
     optional opinionated domain bundles, and native Haystack-YAML import for fully
     custom graphs.
-- **M3 — Grep, scratch, budgets** — two-stage budgeted grep, scratch namespace,
-  full MCP middleware (visibility, per-call enforcement, audit). *Exit:* an agent
-  greps a 1k-file corpus under budget.
+- **M3 — Grep, scratch, budgets** ([ADR 0012](decisions/0012-mcp-tools-and-middleware.md))
+  — a **pluggable tool registry** (`afs.tools` entry-points, so new tools are
+  add-don't-fork) + a uniform **middleware chain** (visibility-filtered
+  `tools/list`, per-call scope/capability enforcement, budgets, audit); the
+  **two-stage budgeted `fs_grep`** (catalog coarse-filter → regex on the subset),
+  `fs_glob`, and the **scratch** workspace tools. *Exit:* an agent greps a
+  1k-file corpus under budget.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
-  `compute_fargate`/`network`, `observability`, `security_guardduty`; the
-  `hardened`/`full`/`byo-postgres` example roots.
+  `compute_fargate`/`network`, `observability`, `security_guardduty`,
+  `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));
+  the `hardened`/`full`/`byo-postgres` example roots.
 
 ## How the pipeline keeps us safe as we add each piece
 
