@@ -38,7 +38,26 @@ variable "image_tag" {
     and Terraform ignores image drift, so this only matters on a fresh create.
   EOT
   type        = string
-  default     = "951da7ab319f"
+  # Bumped to a SHA where both the serving (:<sha>) and worker (:worker-<sha>)
+  # images exist, so the worker Lambda can be created. Serving ignores image drift.
+  default = "fb4eb7015d1e"
+}
+
+variable "enable_ingestion" {
+  description = "Deploy the async extraction pipeline (EventBridge -> SQS -> worker). Requires the worker image pushed to ECR."
+  type        = bool
+  default     = true
+}
+
+variable "extraction_mode" {
+  description = "AFS_EXTRACTION_MODE for the serving API: \"async\" (defer to the worker) or \"inline\" (extract in-request)."
+  type        = string
+  default     = "async"
+
+  validation {
+    condition     = contains(["inline", "async"], var.extraction_mode)
+    error_message = "extraction_mode must be inline or async."
+  }
 }
 
 variable "function_url_auth_type" {
