@@ -40,6 +40,16 @@ output "function_url" {
   value       = var.enable_compute ? module.compute[0].function_url : null
 }
 
+output "worker_function_name" {
+  description = "The extractor worker Lambda (null unless enable_ingestion = true)."
+  value       = var.enable_ingestion ? module.ingestion[0].worker_function_name : null
+}
+
+output "extract_queue_url" {
+  description = "The extract SQS queue URL (null unless enable_ingestion = true)."
+  value       = var.enable_ingestion ? module.ingestion[0].queue_url : null
+}
+
 output "region" {
   description = "AWS region this footprint is deployed into."
   value       = var.aws_region
