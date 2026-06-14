@@ -1,0 +1,61 @@
+# Auto-label PRs by the files they touch (actions/labeler v5 schema).
+# Area labels only — type/triage labels (bug, enhancement, …) are applied by maintainers.
+# Labels referenced here must exist; they are defined in .github/labels.yml.
+
+core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/afs-core/**"
+
+server:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/afs-server/**"
+
+extractors:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/afs-server/src/afs_server/extraction/**"
+
+mcp:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/afs-server/src/afs_server/mcp/**"
+
+connectors:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/afs-connector-sdk/**"
+
+infra:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "terraform/**"
+          - "Dockerfile*"
+          - "docker-compose.yml"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "**/*.md"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - ".pre-commit-config.yaml"
+          - "Makefile"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/tests/**"
+          - "**/conftest.py"
+          - "**/test_*.py"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "uv.lock"
+          - "**/pyproject.toml"

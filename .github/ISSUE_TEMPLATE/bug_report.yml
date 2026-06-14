@@ -1,0 +1,63 @@
+name: Bug report
+description: Report something that isn't working as expected
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please search [existing issues](https://github.com/vivekkhimani/agentic-fs/issues) first to avoid duplicates.
+
+        **Security issue?** Do not file it here — see [SECURITY.md](https://github.com/vivekkhimani/agentic-fs/blob/master/SECURITY.md).
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected to happen instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of the system does this affect?
+      multiple: true
+      options:
+        - core (contracts/models)
+        - server (API)
+        - extractors (extraction pipeline)
+        - mcp (MCP server/tools)
+        - connectors (ingestion SDK)
+        - infra (Terraform/deploy)
+        - docs
+        - not sure
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps, commands, or a code snippet that triggers the bug.
+      placeholder: |
+        1. Run `make dev`
+        2. POST /v1/ingest/...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: Relevant logs or stack traces. This is automatically formatted as code.
+      render: shell
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: How are you running agentic-fs?
+      value: |
+        - Deployment: local docker-compose / AWS / other
+        - agentic-fs version or commit:
+        - Python version:
+        - OS:
+    validations:
+      required: true
