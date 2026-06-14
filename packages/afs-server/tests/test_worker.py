@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from afs_core import keys
 from afs_core.models import ExtractionState
 from afs_core.testing import InMemoryCatalogStore, InMemoryObjectStore, make_entry
@@ -91,6 +93,66 @@ async def test_skips_non_original_keys() -> None:
         [keys.derived_text_key("dev", "ns", "E1", 1), "scratch/dev/p/x.md", "garbage"],
     )
     assert processed == 0
+
+
+class _FakeTextract:
+    """Stands in for the boto3 Textract client — returns LINE blocks like the API."""
+
+    def detect_document_text(self, *, Document: dict) -> dict:
+        return {
+            "Blocks": [
+                {"BlockType": "LINE", "Text": "SCANNED LINE ONE"},
+                {"BlockType": "LINE", "Text": "SCANNED LINE TWO"},
+                {"BlockType": "WORD", "Text": "ignored"},
+            ]
+        }
+
+
+def _ingest_with_textract(catalog, objects) -> IngestService:
+    from afs_server.extraction.docx import DocxNormalizer
+    from afs_server.extraction.pdf import PdfNormalizer
+    from afs_server.extraction.pipeline import ExtractionPipeline
+    from afs_server.extraction.text_native import TextNativeNormalizer
+    from afs_server.extraction.textract import TextractNormalizer
+
+    ladder = [
+        TextNativeNormalizer(),
+        PdfNormalizer(),
+        DocxNormalizer(),
+        TextractNormalizer(client=_FakeTextract()),
+    ]
+    return IngestService(catalog, objects, ExtractionPipeline(ladder))
+
+
+async def test_worker_escalates_scanned_pdf_to_textract() -> None:
+    """The async exit gate: an image-only PDF that the lightweight rungs leave
+    empty (catalog_only inline) is escalated to OCR by the worker. Mirrors the
+    live validation against the scanned.pdf fixture (which has no text layer)."""
+    catalog, objects = _stores()
+    data = (Path(__file__).parent / "fixtures" / "scanned.pdf").read_bytes()
+    await objects.put(
+        keys.originals_key("dev", "ns", "scan.pdf"), data, content_type="application/pdf"
+    )
+    await catalog.put_entry(
+        make_entry(
+            "dev",
+            "ns",
+            "scan.pdf",
+            entry_id="E7",
+            extraction=ExtractionState(status="catalog_only", reason="no_extractor"),
+        )
+    )
+
+    await process_keys(
+        _ingest_with_textract(catalog, objects), [keys.originals_key("dev", "ns", "scan.pdf")]
+    )
+
+    entry = await catalog.get_entry("dev", "ns", "scan.pdf")
+    assert entry is not None
+    assert entry.extraction.status == "extracted"
+    assert entry.extraction.extractor == "textract"
+    page = await objects.get(keys.derived_text_key("dev", "ns", "E7", 1))
+    assert b"SCANNED LINE ONE" in page
 
 
 async def test_worker_skips_rows_already_extracted_inline() -> None:
