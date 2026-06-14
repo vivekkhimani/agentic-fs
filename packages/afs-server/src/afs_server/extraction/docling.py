@@ -24,10 +24,14 @@ Two deliberate choices:
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from afs_core.contracts import NormalizationError
 from afs_core.models import NormalizedDocument, PageText, QualityReport
+
+logger = logging.getLogger("afs_server.extraction.docling")
 
 if TYPE_CHECKING:
     from afs_core.models import SourceDocument
@@ -72,7 +76,11 @@ class DoclingNormalizer:
                     "the 'docling' extraction rung requires the optional dependency; "
                     "install it with `pip install afs-server[docling]`"
                 ) from err
-            self._converter = DocumentConverter()
+            # Load pre-baked models from DOCLING_ARTIFACTS_PATH (set in the worker
+            # image) so cold starts don't download from HF. Pass artifacts_path
+            # explicitly — the env-var auto-detection is unreliable in containers.
+            artifacts_path = os.environ.get("DOCLING_ARTIFACTS_PATH")
+            self._converter = _build_converter(DocumentConverter, artifacts_path)
         return self._converter
 
     def _convert_sync(self, path: str) -> NormalizedDocument:
@@ -120,6 +128,27 @@ class DoclingNormalizer:
     async def normalize(self, doc: SourceDocument) -> NormalizedDocument:
         # Docling is synchronous and CPU/ML-heavy — keep it off the event loop.
         return await asyncio.to_thread(self._convert_sync, str(doc.local_path))
+
+
+def _build_converter(document_converter_cls: Any, artifacts_path: str | None) -> Any:
+    """A DocumentConverter, loading pre-baked models from ``artifacts_path`` when
+    set. Falls back to the default (online) converter if the offline wiring fails
+    (e.g. a docling API shift) — worse cold start, but still functional."""
+    if artifacts_path:
+        try:
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.document_converter import PdfFormatOption
+
+            options = PdfPipelineOptions(artifacts_path=artifacts_path)
+            return document_converter_cls(
+                format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)}
+            )
+        except Exception:  # degrade to online if a docling API shift breaks the wiring
+            logger.warning(
+                "docling artifacts_path wiring failed; falling back to online model download"
+            )
+    return document_converter_cls()
 
 
 def _page_count(document: Any) -> int:

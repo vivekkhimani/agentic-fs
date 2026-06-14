@@ -139,3 +139,34 @@ async def test_normalize_non_paginated_falls_back_to_whole_doc(tmp_path: Path) -
     result = await nz.normalize(_pdf(tmp_path))
     assert len(result.pages) == 1
     assert result.pages[0].markdown == "whole document text"
+
+
+# --- pre-baked-model converter wiring (no real docling needed) ---
+
+
+def test_build_converter_without_artifacts_uses_default() -> None:
+    from afs_server.extraction.docling import _build_converter
+
+    seen: list[dict] = []
+
+    class _Fake:
+        def __init__(self, **kwargs: object) -> None:
+            seen.append(kwargs)
+
+    _build_converter(_Fake, None)
+    assert seen == [{}]  # plain construction, no format_options
+
+
+def test_build_converter_degrades_when_offline_api_unavailable() -> None:
+    # docling isn't installed here, so the artifacts_path branch can't import the
+    # PdfPipelineOptions API → it must fall back to the default converter, not raise.
+    from afs_server.extraction.docling import _build_converter
+
+    seen: list[dict] = []
+
+    class _Fake:
+        def __init__(self, **kwargs: object) -> None:
+            seen.append(kwargs)
+
+    result = _build_converter(_Fake, "/opt/docling/models")
+    assert seen == [{}] and result is not None
