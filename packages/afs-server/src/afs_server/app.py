@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
     catalog = get_catalog_store(settings)
     objects = get_object_store(settings)
     fs_service = FsService(catalog, objects)
-    extraction_pipeline = build_pipeline()
+    extraction_pipeline = build_pipeline(settings.extraction_ladder_names)
 
     mcp_app = build_mcp(fs_service, settings).http_app(path="/")
 

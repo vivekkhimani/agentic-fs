@@ -12,17 +12,22 @@ from __future__ import annotations
 from importlib.metadata import entry_points
 
 from afs_core.contracts import Normalizer
+from afs_server.extraction.docling import DoclingNormalizer
 from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline
 from afs_server.extraction.text_native import TextNativeNormalizer
 
 _NORMALIZER_ENTRY_GROUP = "afs.normalizers"
 
-# Builtin normalizers: name -> factory.
+# Builtin normalizers: name -> factory. `docling` is constructed only when named
+# in the ladder, and only then needs its optional dependency.
 _BUILTIN_NORMALIZERS = {
     "text_native": TextNativeNormalizer,
+    "docling": DoclingNormalizer,
 }
 
-# Default ladder (config, not code — extended as rungs like docling land).
+# Default ladder (config, not code). Just `text_native` so the base install pulls
+# no heavy deps; opt into richer rungs via AFS_EXTRACTION_LADDER (e.g.
+# "text_native,docling") once that rung's extra is installed.
 DEFAULT_LADDER = ["text_native"]
 
 

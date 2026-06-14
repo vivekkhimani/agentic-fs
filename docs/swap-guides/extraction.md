@@ -48,7 +48,17 @@ class Normalizer(Protocol):
 The pipeline walks the ladder in order; the first normalizer that `accepts` the
 document and produces an above-quality-gate result wins. A low-quality result
 (e.g. a near-empty OCR pass) falls through to the next rung — this is how you
-escalate (e.g. `text_native → docling → llamaparse`). Builtins today:
-`text_native`. Reference: `afs_server.extraction`, contract in
-`afs_core/contracts/normalize.py`, decision in
+escalate (e.g. `text_native → docling → llamaparse`).
+
+**Builtins:** `text_native` (always on) and `docling` (PDF/Office/images, OCR for
+scans). Docling pulls heavy ML deps, so it's an **optional extra** and opt-in:
+
+```bash
+pip install "afs-server[docling]"
+export AFS_EXTRACTION_LADDER="text_native,docling"
+```
+
+The base image ships `text_native` only; put `docling` on the (heavier) extractor
+worker rather than the request path. Reference: `afs_server.extraction`, contract
+in `afs_core/contracts/normalize.py`, decision in
 [`docs/decisions/0006-extraction-normalizer-contract.md`](../decisions/0006-extraction-normalizer-contract.md).

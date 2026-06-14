@@ -32,6 +32,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Rich extraction (PDF / Office / images) via Docling — pulls heavy ML deps, so
+# it's opt-in. Enable the rung with AFS_EXTRACTION_LADDER=text_native,docling.
+docling = ["docling>=2"]
 # Reserved for future backends. Intentionally empty until the dependencies
 # exist — declaring the names now keeps the install surface stable.
 # TODO: add the Postgres catalog backend deps when that store lands.

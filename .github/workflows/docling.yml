@@ -1,0 +1,39 @@
+name: Docling rung
+
+# Certifies the optional `docling` extraction rung against a real PDF fixture
+# (packages/afs-server/tests/test_docling_conformance.py). Docling pulls heavy ML
+# deps and downloads models on first run, so this is NOT part of the per-PR
+# Python workflow — it runs on demand and weekly. On Linux the docling-parse
+# wheels exist (they don't on Intel macOS), so this is where the real round-trip
+# is validated.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 6 * * 1' # Mondays 06:37 UTC
+  pull_request:
+    paths:
+      # Only when the rung itself or its fixture changes.
+      - 'packages/afs-server/src/afs_server/extraction/docling.py'
+      - 'packages/afs-server/tests/test_docling_conformance.py'
+      - 'packages/afs-server/tests/fixtures/**'
+      - '.github/workflows/docling.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Certify the docling rung (installs the optional extra)
+        run: >-
+          uv run --with docling
+          pytest packages/afs-server/tests/test_docling_conformance.py -q
