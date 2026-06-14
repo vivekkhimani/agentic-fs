@@ -13,23 +13,29 @@ from importlib.metadata import entry_points
 
 from afs_core.contracts import Normalizer
 from afs_server.extraction.docling import DoclingNormalizer
+from afs_server.extraction.docx import DocxNormalizer
+from afs_server.extraction.pdf import PdfNormalizer
 from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline
 from afs_server.extraction.runner import run_extraction
 from afs_server.extraction.text_native import TextNativeNormalizer
 
 _NORMALIZER_ENTRY_GROUP = "afs.normalizers"
 
-# Builtin normalizers: name -> factory. `docling` is constructed only when named
-# in the ladder, and only then needs its optional dependency.
+# Builtin normalizers: name -> factory. `text_native`/`pdf`/`docx` are
+# lightweight (pure-Python / a small binary) and always available; `docling` is
+# constructed only when named in the ladder, and only then needs its extra.
 _BUILTIN_NORMALIZERS = {
     "text_native": TextNativeNormalizer,
+    "pdf": PdfNormalizer,
+    "docx": DocxNormalizer,
     "docling": DoclingNormalizer,
 }
 
-# Default ladder (config, not code). Just `text_native` so the base install pulls
-# no heavy deps; opt into richer rungs via AFS_EXTRACTION_LADDER (e.g.
-# "text_native,docling") once that rung's extra is installed.
-DEFAULT_LADDER = ["text_native"]
+# Default ladder (config, not code). The lightweight rungs are always available,
+# so common files (text, PDF, Word) are readable with no heavy deps. Add `docling`
+# (its extra) on the heavier path via AFS_EXTRACTION_LADDER, e.g. the async worker
+# runs "text_native,pdf,docx,docling" to escalate scans/complex layout.
+DEFAULT_LADDER = ["text_native", "pdf", "docx"]
 
 
 def _build_normalizer(name: str) -> Normalizer:
