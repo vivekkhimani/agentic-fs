@@ -47,18 +47,23 @@ class Normalizer(Protocol):
 
 The pipeline walks the ladder in order; the first normalizer that `accepts` the
 document and produces an above-quality-gate result wins. A low-quality result
-(e.g. a near-empty OCR pass) falls through to the next rung — this is how you
-escalate (e.g. `text_native → docling → llamaparse`).
+(e.g. a text-layer-less scanned PDF) falls through to the next rung — this is how
+the lightweight rungs handle the common case and **`docling` escalates** for what
+they can't (scans, complex tables/layout).
 
-**Builtins:** `text_native` (always on) and `docling` (PDF/Office/images, OCR for
-scans). Docling pulls heavy ML deps, so it's an **optional extra** and opt-in:
+**Lightweight builtins (always on, no ML):** `text_native`, `pdf` (pypdfium2 text
+layer), `docx` (python-docx). Common files extract **synchronously, in-request** —
+the default ladder is `text_native,pdf,docx`.
+
+**`docling`** (PDF/Office/images, OCR) is a heavier **optional extra**, for the
+quality cases — put it on the async extractor worker, not the request path:
 
 ```bash
 pip install "afs-server[docling]"
-export AFS_EXTRACTION_LADDER="text_native,docling"
+# worker: try the light rungs first, escalate to docling where they fall short
+export AFS_EXTRACTION_LADDER="text_native,pdf,docx,docling"
 ```
 
-The base image ships `text_native` only; put `docling` on the (heavier) extractor
-worker rather than the request path. Reference: `afs_server.extraction`, contract
-in `afs_core/contracts/normalize.py`, decision in
-[`docs/decisions/0006-extraction-normalizer-contract.md`](../decisions/0006-extraction-normalizer-contract.md).
+Reference: `afs_server.extraction`, contract in `afs_core/contracts/normalize.py`,
+decisions in [`0006`](../decisions/0006-extraction-normalizer-contract.md)
+(contract) and [`0009`](../decisions/0009-async-extraction-pipeline.md) (sync vs async).

@@ -113,6 +113,8 @@ dependencies = [
     { name = "fastapi" },
     { name = "fastmcp" },
     { name = "pydantic-settings" },
+    { name = "pypdfium2" },
+    { name = "python-docx" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -133,6 +135,8 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "fastmcp", specifier = ">=2" },
     { name = "pydantic-settings", specifier = ">=2.2" },
+    { name = "pypdfium2", specifier = ">=4" },
+    { name = "python-docx", specifier = ">=1" },
     { name = "torch", marker = "extra == 'docling'", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torchvision", marker = "extra == 'docling'", index = "https://download.pytorch.org/whl/cpu" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
