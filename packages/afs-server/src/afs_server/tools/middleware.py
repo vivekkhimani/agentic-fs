@@ -35,6 +35,25 @@ if TYPE_CHECKING:
 logger = structlog.get_logger("afs_server.tools")
 
 
+def _result_bytes(result: object) -> int:
+    """Serialized size of a tool result — the bytes that reach the agent.
+
+    Sums the UTF-8 length of each content block's text (and any base64 blob/image
+    payload). FastMCP serializes a tool's return into these blocks, so this is the
+    real context cost, independent of the Python object shape behind it.
+    """
+    total = 0
+    for block in getattr(result, "content", None) or []:
+        text = getattr(block, "text", None)
+        if text is not None:
+            total += len(text.encode("utf-8"))
+            continue
+        data = getattr(block, "data", None)  # image / blob blocks carry base64
+        if isinstance(data, str):
+            total += len(data.encode("utf-8"))
+    return total
+
+
 class ToolMiddleware(Middleware):
     def __init__(self, tools_by_name: dict[str, Tool], settings: Settings) -> None:
         self._tools = tools_by_name
@@ -67,4 +86,19 @@ class ToolMiddleware(Middleware):
             raise ToolError(f"missing required scope(s): {', '.join(missing)}")
 
         logger.info("tool call", tool=name, tenant=ctx.tenant_id, principal=ctx.principal_id)
-        return await call_next(context)
+        result = await call_next(context)
+
+        budget = self._settings.tool_max_result_bytes
+        if budget and (size := _result_bytes(result)) > budget:
+            logger.warning(
+                "tool result over budget",
+                tool=name,
+                principal=ctx.principal_id,
+                bytes=size,
+                budget=budget,
+            )
+            raise ToolError(
+                f"{name} result is {size} bytes, over the {budget}-byte per-call budget — "
+                "narrow your query (tighter pattern/glob, a smaller page range, or a lower limit)."
+            )
+        return result

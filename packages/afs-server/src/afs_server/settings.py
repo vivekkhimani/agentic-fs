@@ -74,6 +74,13 @@ class Settings(BaseSettings):
     # WARNING to quiet down.
     log_level: str = "INFO"
 
+    # --- MCP tool middleware ---
+    # A uniform per-call output budget (ADR 0012): the middleware rejects any tool
+    # result whose serialized size exceeds this, with a "narrow your query" error —
+    # an output-size safety net above each tool's own caps, so a misbehaving plugin
+    # tool can't blow the agent's context window. 0 disables the net.
+    tool_max_result_bytes: int = 262_144  # 256 KiB
+
     # --- auth ---
     # "dev" = a static local principal (NEVER for production); "oidc" = the OAuth
     # resource server (not yet implemented — fails closed until that slice lands).

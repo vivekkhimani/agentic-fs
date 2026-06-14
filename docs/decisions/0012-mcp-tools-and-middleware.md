@@ -43,8 +43,13 @@ Two goals drive the design:
      namespaces enable).
   3. **Per-call enforcement** — re-check scope/capability/namespace on invoke
      (visibility is UX; enforcement is the gate).
-  4. **Budgets** — per-call output caps (max items/matches/bytes) so a tool can't
-     blow the context window or run unboundedly.
+  4. **Budgets** — two layers so a tool can't blow the context window: each tool
+     sets its own domain caps (max items/matches/context-lines), and the chain
+     enforces a **uniform per-call output budget** (`AFS_TOOL_MAX_RESULT_BYTES`,
+     256 KiB default) over the serialized result — a result over budget is
+     **rejected** with a "narrow your query" error rather than truncated (keeps
+     the payload structurally valid), so even a plugin tool with no caps of its
+     own is bounded.
   5. **Audit** — structured log of `(principal, tool, args-summary, outcome)`
      (structlog, [ADR 0009 logging]).
 

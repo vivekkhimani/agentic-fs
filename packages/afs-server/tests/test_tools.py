@@ -35,15 +35,31 @@ class _NeedsBogusScope:
             return {"ok": True}
 
 
+class _Firehose:
+    """A tool with no caps of its own — the per-call budget is its only guard."""
+
+    name = "firehose"
+    required_scopes: frozenset[str] = frozenset()
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def firehose(size: int) -> dict:
+            """returns `size` bytes of payload, unbounded"""
+            return {"blob": "x" * size}
+
+
 @pytest.fixture
 async def client() -> AsyncIterator[Client]:
     cat, obj = InMemoryCatalogStore(), InMemoryObjectStore()
     deps = ToolDeps(fs=FsService(cat, obj), scratch=ScratchService(cat, obj), settings=Settings())
     mcp: FastMCP = FastMCP("t")
-    tools = [*build_tools(), _NeedsBogusScope()]
+    tools = [*build_tools(), _NeedsBogusScope(), _Firehose()]
     for tool in tools:
         tool.register(mcp, deps)
-    mcp.add_middleware(ToolMiddleware({t.name: t for t in tools}, Settings()))
+    # A small budget so the test needn't materialize the 256 KiB default.
+    settings = Settings(tool_max_result_bytes=1024)
+    mcp.add_middleware(ToolMiddleware({t.name: t for t in tools}, settings))
     async with Client(mcp) as c:
         yield c
 
@@ -62,3 +78,13 @@ async def test_call_is_scope_enforced(client: Client) -> None:
 async def test_allowed_tool_still_runs(client: Client) -> None:
     res = await client.call_tool("whoami", {})
     assert res.data["tenant_id"] == "dev"
+
+
+async def test_under_budget_result_passes(client: Client) -> None:
+    res = await client.call_tool("firehose", {"size": 100})
+    assert len(res.data["blob"]) == 100
+
+
+async def test_over_budget_result_is_rejected(client: Client) -> None:
+    with pytest.raises(ToolError, match="per-call budget"):
+        await client.call_tool("firehose", {"size": 4096})
