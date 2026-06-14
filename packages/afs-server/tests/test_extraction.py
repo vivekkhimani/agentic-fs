@@ -8,8 +8,9 @@ import pytest
 
 from afs_core.models import SourceDocument
 from afs_core.testing import NormalizerConformance
-from afs_server.extraction import build_pipeline
+from afs_server.extraction import DEFAULT_LADDER, build_pipeline
 from afs_server.extraction.text_native import TextNativeNormalizer
+from afs_server.settings import Settings
 
 
 def _doc(path: Path, content_type: str) -> SourceDocument:
@@ -57,3 +58,21 @@ async def test_pipeline_empty_text_is_catalog_only(tmp_path: Path) -> None:
 def test_registry_rejects_unknown_normalizer() -> None:
     with pytest.raises(ValueError, match="unknown normalizer"):
         build_pipeline(["does-not-exist"])
+
+
+def test_settings_default_ladder_matches_default_ladder() -> None:
+    """The app builds its pipeline from settings (never build_pipeline(None)), so a
+    drift between the settings default and DEFAULT_LADDER silently shrinks the
+    inline ladder — which once made every born-digital PDF land catalog_only."""
+    assert Settings().extraction_ladder_names == DEFAULT_LADDER
+
+
+async def test_default_pipeline_extracts_born_digital_pdf() -> None:
+    """A text-layer PDF must extract on the default (no-extra) ladder, inline."""
+    pdf = Path(__file__).parent / "fixtures" / "sample.pdf"
+    outcome = await build_pipeline(Settings().extraction_ladder_names).run(
+        _doc(pdf, "application/pdf")
+    )
+    assert outcome is not None
+    assert outcome.extractor == "pdf"
+    assert outcome.document.pages
