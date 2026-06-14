@@ -52,6 +52,15 @@ data "aws_iam_policy_document" "exec" {
     resources = [var.data_bucket_arn]
   }
 
+  # Write path (ingestion): store the original document + its derived-text pages,
+  # and delete them on removal. Scoped to objects in the data bucket.
+  statement {
+    sid       = "WriteDataBucket"
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["${var.data_bucket_arn}/*"]
+  }
+
   # Read path: catalog queries (table + GSIs).
   statement {
     sid    = "ReadCatalog"
@@ -65,17 +74,33 @@ data "aws_iam_policy_document" "exec" {
     resources = [var.catalog_table_arn, "${var.catalog_table_arn}/index/*"]
   }
 
-  # Decrypt SSE-KMS objects with the project CMK.
+  # Write path (ingestion): upsert + delete catalog rows. Item writes target the
+  # base table only (index rows are maintained by DynamoDB, not written directly).
   statement {
-    sid       = "DecryptWithCmk"
+    sid    = "WriteCatalog"
+    effect = "Allow"
+    actions = [
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
+    ]
+    resources = [var.catalog_table_arn]
+  }
+
+  # Use the project CMK for SSE-KMS. Decrypt/DescribeKey serve the read path;
+  # Encrypt/GenerateDataKey are required to WRITE SSE-KMS objects (S3 requests a
+  # data key per put). DynamoDB encryption uses a KMS grant, so it needs nothing
+  # here.
+  statement {
+    sid       = "UseCmk"
     effect    = "Allow"
-    actions   = ["kms:Decrypt", "kms:DescribeKey"]
+    actions   = ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey"]
     resources = [var.kms_key_arn]
   }
 }
 
 resource "aws_iam_role_policy" "exec" {
-  name   = "agentic-fs-api-read"
+  name   = "agentic-fs-api"
   role   = aws_iam_role.exec.id
   policy = data.aws_iam_policy_document.exec.json
 }
