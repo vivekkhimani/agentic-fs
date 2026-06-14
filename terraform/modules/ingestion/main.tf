@@ -215,7 +215,8 @@ resource "aws_lambda_event_source_mapping" "worker" {
 # Reconciler — scheduled sweep that heals catalog drift from S3 ("rebuildable
 # from S3"). Reuses the worker image with the reconcile handler. It only *detects*
 # drift: it enqueues missing/stale/re-added objects onto the extract queue (the
-# worker extracts) and soft-deletes orphaned rows. No S3 object reads → no CMK.
+# worker extracts) and soft-deletes orphaned rows. It never reads S3 objects, but
+# the catalog table is CMK-encrypted so it still needs KMS for catalog access.
 # ---------------------------------------------------------------------------
 locals {
   reconciler_name = "${var.name_prefix}-reconciler"
@@ -266,6 +267,14 @@ data "aws_iam_policy_document" "reconciler" {
     effect    = "Allow"
     actions   = ["sqs:SendMessage"]
     resources = [aws_sqs_queue.extract.arn]
+  }
+  # The catalog table is CMK-encrypted, so even Query/Scan needs Decrypt and a
+  # tombstone PutItem needs GenerateDataKey. (No S3 GetObject → no S3 decrypt.)
+  statement {
+    sid       = "UseCmk"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt", "kms:DescribeKey", "kms:GenerateDataKey"]
+    resources = [var.kms_key_arn]
   }
 }
 
