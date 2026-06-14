@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from importlib.metadata import entry_points
+from typing import TYPE_CHECKING
 
 from afs_core.contracts import Normalizer
 from afs_server.extraction.docling import DoclingNormalizer
@@ -25,6 +26,9 @@ from afs_server.extraction.tesseract import TesseractNormalizer
 from afs_server.extraction.text_native import TextNativeNormalizer
 from afs_server.extraction.textract import TextractNormalizer
 from afs_server.extraction.textract_analyze import TextractAnalyzeNormalizer
+
+if TYPE_CHECKING:
+    from afs_server.settings import Settings
 
 logger = logging.getLogger("afs_server.extraction")
 
@@ -107,10 +111,34 @@ def build_pipeline(
     )
 
 
+def build_from_settings(settings: Settings) -> ExtractionRunner:
+    """The extraction runner the app/worker use: a per-content-type **routed**
+    pipeline when ``AFS_PIPELINE_FILE`` is set, else a single ladder/preset. Both
+    honour the engine (``AFS_PIPELINE_ENGINE``) and the confidence gate."""
+    if settings.pipeline_file:
+        from afs_server.extraction.routing import RoutedExtractionPipeline, load_pipeline_file
+
+        config = load_pipeline_file(settings.pipeline_file)
+        min_confidence = (
+            config.min_confidence
+            if config.min_confidence is not None
+            else settings.extraction_min_confidence
+        )
+        return RoutedExtractionPipeline(
+            config.routes, engine=settings.pipeline_engine, min_confidence=min_confidence
+        )
+    return build_pipeline(
+        settings.extraction_ladder_names,
+        min_confidence=settings.extraction_min_confidence,
+        engine=settings.pipeline_engine,
+    )
+
+
 __all__ = [
     "ExtractionOutcome",
     "ExtractionPipeline",
     "ExtractionRunner",
+    "build_from_settings",
     "build_pipeline",
     "run_extraction",
 ]

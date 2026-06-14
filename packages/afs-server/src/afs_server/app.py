@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 
 from afs_core.errors import AfsError
 from afs_server import __version__
-from afs_server.extraction import build_pipeline
+from afs_server.extraction import build_from_settings
 from afs_server.logging_config import configure_logging
 from afs_server.mcp import build_mcp
 from afs_server.routers import connectors, fs, ingest, meta
@@ -43,11 +43,7 @@ def create_app() -> FastAPI:
     catalog = get_catalog_store(settings)
     objects = get_object_store(settings)
     fs_service = FsService(catalog, objects)
-    extraction_pipeline = build_pipeline(
-        settings.extraction_ladder_names,
-        min_confidence=settings.extraction_min_confidence,
-        engine=settings.pipeline_engine,
-    )
+    extraction_pipeline = build_from_settings(settings)
 
     mcp_app = build_mcp(fs_service, settings).http_app(path="/")
 

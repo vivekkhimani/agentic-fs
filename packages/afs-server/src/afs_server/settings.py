@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # multimodal | full. A convenience over hand-listing rungs; an explicit
     # extraction_ladder overrides it.
     pipeline_preset: str | None = None
+    # Path to a routing YAML (ADR 0010): per-content-type ladders (see
+    # extraction.routing). When set, it takes precedence over ladder/preset.
+    pipeline_file: str | None = None
 
     # Extraction pipeline engine: "haystack" (configurable graph engine, ADR 0010 —
     # the default; needs the [haystack] extra, shipped in the worker image) or

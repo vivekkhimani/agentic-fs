@@ -110,9 +110,11 @@ it — so the system is demoable at every step (plan §15).
   worker image); the ladder stays a slim, zero-dep **"lite" mode**
   (`AFS_PIPELINE_ENGINE=ladder`, also the transparent fallback when the extra is
   absent) ✅. **Presets** (`AFS_PIPELINE_PRESET=lite|ocr|tables|multimodal|full`)
-  let users pick a curated pipeline instead of hand-listing rungs ✅. Remaining
-  phase-2 work: content-type (`FileTypeRouter`) + YAML pipelines. Then Drive's
-  delta `changes.list` (L2) + SharePoint. *Exit:* a corrupt PDF lands
+  let users pick a curated pipeline instead of hand-listing rungs ✅.
+  **Content-type routing** (`AFS_PIPELINE_FILE` → per-MIME ladders in YAML) sends
+  images to vision, PDFs to table-structure rungs, etc. ✅ — this is what the
+  Haystack engine unlocks over the linear ladder. Then Drive's delta
+  `changes.list` (L2) + SharePoint. *Exit:* a corrupt PDF lands
   `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
   - **Backlog (post-engine):** ship a set of **pre-packaged Haystack pipeline
     presets** users pick from instead of wiring components themselves — e.g.

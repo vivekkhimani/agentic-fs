@@ -17,7 +17,7 @@ from urllib.parse import unquote_plus
 import structlog
 
 from afs_core import keys
-from afs_server.extraction import build_pipeline
+from afs_server.extraction import build_from_settings
 from afs_server.logging_config import configure_logging
 from afs_server.services import IngestService
 from afs_server.settings import load_settings
@@ -78,11 +78,7 @@ def handler(event: dict[str, Any], context: object = None) -> dict[str, Any]:
     ingest = IngestService(
         get_catalog_store(settings),
         get_object_store(settings),
-        build_pipeline(
-            settings.extraction_ladder_names,
-            min_confidence=settings.extraction_min_confidence,
-            engine=settings.pipeline_engine,
-        ),
+        build_from_settings(settings),
     )
     processed = asyncio.run(process_keys(ingest, object_keys))
     logger.info("batch complete", received=len(object_keys), processed=processed)
