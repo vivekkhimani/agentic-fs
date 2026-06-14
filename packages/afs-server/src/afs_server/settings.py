@@ -32,17 +32,21 @@ class Settings(BaseSettings):
     # infra); "async" stores the doc + a `pending` row and lets the extractor
     # worker complete it off an S3 event (ADR 0009). Default inline.
     extraction_mode: str = "inline"
-    # Comma-separated ladder of normalizer names, tried in order. The default is
-    # the lightweight, always-available rungs (pypdfium2/python-docx are base
-    # deps), so born-digital PDFs and Word docs extract inline with no extras —
-    # keep this in sync with extraction.DEFAULT_LADDER. Richer rungs are opt-in
-    # and need their extra (e.g. "text_native,pdf,docx,docling" with
-    # afs-server[docling]).
-    extraction_ladder: str = "text_native,pdf,docx"
+    # Comma-separated ladder of normalizer names, tried in order — the low-level
+    # override. When unset, the ladder comes from `pipeline_preset` (or the `lite`
+    # preset by default). Richer rungs are opt-in and need their extra (e.g.
+    # "text_native,pdf,docx,docling" with afs-server[docling]).
+    extraction_ladder: str = ""
+    # A named, curated pipeline (see extraction.presets): lite | ocr | tables |
+    # multimodal | full. A convenience over hand-listing rungs; an explicit
+    # extraction_ladder overrides it.
+    pipeline_preset: str | None = None
 
-    # Extraction pipeline engine: "ladder" (built-in linear cascade, default) or
-    # "haystack" (configurable graph engine, ADR 0010 — needs the [haystack] extra).
-    pipeline_engine: str = "ladder"
+    # Extraction pipeline engine: "haystack" (configurable graph engine, ADR 0010 —
+    # the default; needs the [haystack] extra, shipped in the worker image) or
+    # "ladder" (built-in linear cascade — a slim, zero-dep "lite" mode). If
+    # "haystack" is selected but the extra isn't installed, the ladder runs instead.
+    pipeline_engine: str = "haystack"
     # Escalate a result whose reported confidence (0..1, e.g. OCR) is below this to
     # the next ladder rung. 0.0 (default) never gates on confidence; e.g. 0.6 sends
     # shaky Textract OCR on to a stronger rung (llm).
@@ -50,7 +54,11 @@ class Settings(BaseSettings):
 
     @property
     def extraction_ladder_names(self) -> list[str]:
-        return [name.strip() for name in self.extraction_ladder.split(",") if name.strip()]
+        if self.extraction_ladder.strip():
+            return [name.strip() for name in self.extraction_ladder.split(",") if name.strip()]
+        from afs_server.extraction.presets import preset_ladder
+
+        return preset_ladder(self.pipeline_preset or "lite")
 
     # Level for the `afs_server` loggers (INFO surfaces extraction declines,
     # escalation, and per-document worker progress to CloudWatch). DEBUG to dig in,

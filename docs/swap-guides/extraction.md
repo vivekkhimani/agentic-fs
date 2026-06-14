@@ -62,6 +62,32 @@ threshold escalates to the next rung — e.g. set `0.6` to send shaky OCR on to 
 layer), `docx` (python-docx). Common files extract **synchronously, in-request** —
 the default ladder is `text_native,pdf,docx`.
 
+## Presets & the pipeline engine
+
+Instead of hand-listing rungs, pick a **preset** — `AFS_PIPELINE_PRESET=<name>`:
+
+| Preset | Rungs | For |
+|---|---|---|
+| `lite` (default) | text_native, pdf, docx | lightweight, no extras |
+| `ocr` | + textract | scans/handwriting (managed OCR) |
+| `tables` | text_native, pdftables, docx, textract_analyze | table/form structure |
+| `multimodal` | text_native, pdf, docx, llm | LLM — also describes diagrams |
+| `full` | text_native, pdftables, docx, textract_analyze, llm | everything, escalating |
+
+An explicit `AFS_EXTRACTION_LADDER` overrides the preset. A preset rung whose extra
+isn't installed just declines and the ladder falls through, so a preset never
+hard-fails on a missing extra.
+
+Two **engines** run a ladder, chosen with `AFS_PIPELINE_ENGINE`:
+- **`haystack`** (default) — the ladder runs as a Haystack `AsyncPipeline` (ADR
+  0010), the basis for branching/YAML pipelines. Needs the `[haystack]` extra (the
+  worker image ships it). If the extra is absent, it transparently falls back to:
+- **`ladder`** — the built-in linear cascade. A slim, **zero-dep "lite" mode** for
+  cost-sensitive deploys (the serving image runs this for its inline rungs).
+
+Both engines walk the same rungs and honour the same quality gate — identical
+results; `haystack` just unlocks richer pipelines later.
+
 **OCR / heavier rungs are optional extras** — install only what your ladder
 names, so the image stays as light as your pipeline:
 

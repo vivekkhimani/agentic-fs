@@ -42,16 +42,18 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY packages/afs-core/pyproject.toml packages/afs-core/README.md ./packages/afs-core/
 COPY packages/afs-server/pyproject.toml packages/afs-server/README.md ./packages/afs-server/
+# The worker runs the Haystack pipeline engine (the default), so [haystack] is
+# always installed here, on top of the chosen rung extras (AFS_EXTRAS).
 RUN --mount=type=cache,target=/root/.cache/uv \
     set -eux; \
-    flags=""; for e in $(echo "$AFS_EXTRAS" | tr ',' ' '); do flags="$flags --extra $e"; done; \
+    flags="--extra haystack"; for e in $(echo "$AFS_EXTRAS" | tr ',' ' '); do flags="$flags --extra $e"; done; \
     uv sync --frozen --no-dev --no-install-workspace --package afs-server $flags
 
 # Project layer — install the workspace packages themselves (built wheels).
 COPY packages/ ./packages/
 RUN --mount=type=cache,target=/root/.cache/uv \
     set -eux; \
-    flags=""; for e in $(echo "$AFS_EXTRAS" | tr ',' ' '); do flags="$flags --extra $e"; done; \
+    flags="--extra haystack"; for e in $(echo "$AFS_EXTRAS" | tr ',' ' '); do flags="$flags --extra $e"; done; \
     uv sync --frozen --no-dev --no-editable --package afs-server $flags
 
 # ---------------------------------------------------------------------------
