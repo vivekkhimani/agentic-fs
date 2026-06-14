@@ -122,3 +122,36 @@ def test_ingest_then_read_round_trip(client: TestClient) -> None:
     assert client.delete("/v1/ingest/handbook/doc", params={"path": "guide.md"}).status_code == 202
     gone = client.get("/v1/fs/handbook/stat", params={"path": "guide.md"})
     assert gone.status_code == 404
+
+
+def test_ingest_records_connector_provenance(client: TestClient) -> None:
+    put = client.put(
+        "/v1/ingest/handbook/doc",
+        params={"path": "from/connector.md"},
+        content=b"# hi",
+        headers={
+            "content-type": "text/markdown",
+            "X-Afs-Connector-Id": "local",
+            "X-Afs-Remote-Id": "/abs/connector.md",
+            "X-Afs-Source-Version": "mtime:42:4",
+        },
+    )
+    assert put.status_code == 201
+    assert put.json()["source"] == {
+        "connector_id": "local",
+        "remote_id": "/abs/connector.md",
+        "version": "mtime:42:4",
+    }
+    # stat reflects the stored version → this is what L1 version-skip reads back.
+    stat = client.get("/v1/fs/handbook/stat", params={"path": "from/connector.md"})
+    assert stat.json()["source"]["version"] == "mtime:42:4"
+
+
+def test_connector_checkpoint_roundtrip(client: TestClient) -> None:
+    assert client.get("/v1/connectors/local/checkpoint").json() is None
+    put = client.put(
+        "/v1/connectors/local/checkpoint", json={"connector_id": "local", "cursor": "tok-1"}
+    )
+    assert put.status_code == 204
+    got = client.get("/v1/connectors/local/checkpoint")
+    assert got.status_code == 200 and got.json()["cursor"] == "tok-1"

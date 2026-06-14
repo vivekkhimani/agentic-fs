@@ -8,6 +8,7 @@ the transmitted URL disagree on how a path like ``a/b.md`` is escaped.
 
 from __future__ import annotations
 
+import json
 from types import TracebackType
 from typing import Any
 
@@ -46,10 +47,13 @@ class IngestClient:
         params: dict[str, Any] | None = None,
         content: bytes | None = None,
         content_type: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> httpx.Response:
-        headers = {"content-type": content_type} if content_type else {}
+        all_headers = dict(headers or {})
+        if content_type:
+            all_headers["content-type"] = content_type
         request = self._http.build_request(
-            method, f"{self._base}{path}", params=params, content=content, headers=headers
+            method, f"{self._base}{path}", params=params, content=content, headers=all_headers
         )
         request.headers.update(
             self._signer.headers_for(
@@ -59,14 +63,31 @@ class IngestClient:
         return await self._http.send(request)
 
     async def put_document(
-        self, namespace: str, path: str, data: bytes, *, content_type: str | None = None
+        self,
+        namespace: str,
+        path: str,
+        data: bytes,
+        *,
+        content_type: str | None = None,
+        connector_id: str | None = None,
+        remote_id: str | None = None,
+        source_version: str | None = None,
     ) -> dict[str, Any]:
+        # Provenance headers let a later sync skip the fetch when nothing changed.
+        headers: dict[str, str] = {}
+        if connector_id:
+            headers["X-Afs-Connector-Id"] = connector_id
+        if remote_id:
+            headers["X-Afs-Remote-Id"] = remote_id
+        if source_version:
+            headers["X-Afs-Source-Version"] = source_version
         resp = await self._send(
             "PUT",
             f"/v1/ingest/{namespace}/doc",
             params={"path": path},
             content=data,
             content_type=content_type,
+            headers=headers,
         )
         resp.raise_for_status()
         return resp.json()
@@ -97,3 +118,20 @@ class IngestClient:
             cursor = page.get("next_cursor")
             if not cursor:
                 return paths
+
+    async def get_checkpoint(self, connector_id: str) -> str | None:
+        """The connector's persisted sync cursor, or None if it has never synced."""
+        resp = await self._send("GET", f"/v1/connectors/{connector_id}/checkpoint")
+        resp.raise_for_status()
+        body = resp.json()
+        return body.get("cursor") if body else None
+
+    async def put_checkpoint(self, connector_id: str, cursor: str) -> None:
+        payload = json.dumps({"connector_id": connector_id, "cursor": cursor}).encode("utf-8")
+        resp = await self._send(
+            "PUT",
+            f"/v1/connectors/{connector_id}/checkpoint",
+            content=payload,
+            content_type="application/json",
+        )
+        resp.raise_for_status()

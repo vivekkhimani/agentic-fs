@@ -18,7 +18,7 @@ from afs_core.errors import AfsError
 from afs_server import __version__
 from afs_server.extraction import build_pipeline
 from afs_server.mcp import build_mcp
-from afs_server.routers import fs, ingest, meta
+from afs_server.routers import connectors, fs, ingest, meta
 from afs_server.services import FsService
 from afs_server.settings import load_settings
 from afs_server.stores import get_catalog_store, get_object_store
@@ -68,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(meta.router)
     app.include_router(fs.router)
     app.include_router(ingest.router)
+    app.include_router(connectors.router)
     app.mount("/mcp", mcp_app)
     return app
 
