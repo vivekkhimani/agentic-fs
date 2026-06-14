@@ -97,8 +97,12 @@ it — so the system is demoable at every step (plan §15).
   [ADR 0008](decisions/0008-incremental-sync.md)), and the **async extraction
   worker** + two-mode ingest + the **`ingestion` Terraform module** (EventBridge →
   SQS → `docling` worker Lambda, [ADR 0009](decisions/0009-async-extraction-pipeline.md))
-  have landed. Next: deploy + live-validate the async path, then Drive's delta
-  `changes.list` (L2) + SharePoint, and the reconciler. *Exit:* a corrupt PDF lands
+  have landed (async path **live-validated**: a scanned PDF degrades to
+  `catalog_only` inline and the worker escalates it via Textract OCR). Next: the
+  **reconciler**, and the **extraction-routing** upgrade — a Haystack pipeline
+  engine with structure-preserving + multimodal rungs (`textract_analyze`, `llm`),
+  cascade/content-type/optional-LLM routing ([ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)).
+  Then Drive's delta `changes.list` (L2) + SharePoint. *Exit:* a corrupt PDF lands
   `catalog_only` and is still cite-able; a hand-deleted catalog row heals.
 - **M3 — Grep, scratch, budgets** — two-stage budgeted grep, scratch namespace,
   full MCP middleware (visibility, per-call enforcement, audit). *Exit:* an agent
