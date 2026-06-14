@@ -86,7 +86,27 @@ Two **engines** run a ladder, chosen with `AFS_PIPELINE_ENGINE`:
   cost-sensitive deploys (the serving image runs this for its inline rungs).
 
 Both engines walk the same rungs and honour the same quality gate — identical
-results; `haystack` just unlocks richer pipelines later.
+results; `haystack` unlocks **content-type routing** (below).
+
+### Content-type routing (`AFS_PIPELINE_FILE`)
+
+A single ladder runs every rung for every doc. **Routing** sends each document to a
+ladder chosen by its MIME type — images skip the text rungs and go to vision, PDFs
+prefer table structure, etc. Point `AFS_PIPELINE_FILE` at a small YAML:
+
+```yaml
+# afs-pipeline.yaml
+min_confidence: 0.6        # optional; overrides AFS_MIN_CONFIDENCE
+routes:
+  "image/*":         [textract_analyze, llm]                       # scans/photos → OCR/vision
+  "application/pdf":  [text_native, pdf, pdftables, textract_analyze, llm]
+  "*":                [text_native, pdf, docx]                     # default
+```
+
+Match order is most-specific-first: exact MIME → `type/*` prefix → the `*` default.
+A type matching no route (and no `*`) lands `catalog_only`. Each route is a normal
+cascade — same rungs, same quality gate, same engine — so routing composes with
+everything above. `AFS_PIPELINE_FILE` takes precedence over preset/ladder.
 
 **OCR / heavier rungs are optional extras** — install only what your ladder
 names, so the image stays as light as your pipeline:
