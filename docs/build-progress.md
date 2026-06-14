@@ -141,8 +141,9 @@ it — so the system is demoable at every step (plan §15).
   oversized results are rejected with a "narrow your query" error, not truncated)
   rounds out the middleware so even a cap-less plugin tool stays inside the
   context window ✅. *Exit:* an agent greps a 1k-file corpus under budget — met by
-  the bounded two-stage grep + the middleware net. The live MCP-surface dry-run is
-  the remaining validation.
+  the bounded two-stage grep + the middleware net. **Validated end-to-end** by a
+  live MCP-surface dry-run (discover → glob → grep → ranged read → scratch CRUD →
+  budget rejection) against real MinIO + DynamoDB Local ✅.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
   `compute_fargate`/`network`, `observability`, `security_guardduty`,
   `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));
