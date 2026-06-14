@@ -114,6 +114,39 @@ def build_token_verifier(settings: Settings) -> TokenVerifier | None:
     )
 
 
+def build_resource_auth(settings: Settings, verifier: TokenVerifier | None):
+    """A FastMCP ``RemoteAuthProvider`` for the MCP mount (``None`` for dev).
+
+    Wraps the shared verifier and serves OAuth Protected Resource Metadata
+    (RFC 9728) so MCP clients self-discover the authorization server — the
+    "zero auth code on the client" DX. Needs the issuer to advertise the AS.
+    """
+    if verifier is None:
+        return None
+    if not settings.oidc_issuer:
+        raise UnauthenticatedError(
+            "the oidc MCP mount needs AFS_OIDC_ISSUER to advertise the authorization "
+            "server in its resource metadata"
+        )
+    from fastmcp.server.auth import RemoteAuthProvider
+    from pydantic import AnyHttpUrl
+
+    return RemoteAuthProvider(
+        token_verifier=verifier,
+        authorization_servers=[AnyHttpUrl(settings.oidc_issuer)],
+        base_url=settings.public_base_url,
+        resource_name="agentic-fs",
+    )
+
+
+def principal_from_access_token(token: Any, settings: Settings) -> TenantContext:
+    """A *verified* FastMCP ``AccessToken`` → :class:`TenantContext`. ``None``
+    (no/invalid token) fails closed."""
+    if token is None:
+        raise UnauthenticatedError("missing or invalid bearer token")
+    return context_from_claims(token.claims, settings)
+
+
 def _scope_set(value: object) -> frozenset[str]:
     """Scopes are trusted from the token: a space-delimited string or a list."""
     if value is None:

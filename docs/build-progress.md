@@ -153,13 +153,15 @@ it — so the system is demoable at every step (plan §15).
   (`RemoteAuthProvider`/`JWTVerifier`); the same verifier backs a FastAPI bearer
   dep so REST + MCP share one path. *Slices:* ① ADR ✅ → ② core verifier +
   claims→`TenantContext` ✅ (`build_token_verifier` + `context_from_claims`,
-  13 RSA-keypair tests, no live IdP) → ③ wire both surfaces + request-aware
-  `resolve_context` (M3 enforcement goes live) → ④ `auth_cognito` is **deferred,
-  greenfield-only** (not core; `static-jwt` mode + recipes cover the no-IdP gap).
-  **DX multipliers (queued):**
-  `afs auth doctor` (paste a token → see claims + resolved context), auto-served
-  PRM (MCP clients need zero auth code), per-IdP recipe pages (WorkOS/Cognito/
-  Auth0/Okta/Keycloak), and a `static-jwt` local mode (full path, no IdP).
+  RSA-keypair tests, no live IdP) → ③ **both surfaces wired** ✅ — REST bearer dep
+  verifies + maps; MCP mount gets the `RemoteAuthProvider` (transport auth +
+  auto-PRM) and the middleware resolves the principal from the verified token, so
+  **M3 enforcement is now live** (10 wiring tests: REST 401/forged-token, MCP
+  provider + token→principal) → ④ `auth_cognito` is **deferred, greenfield-only**
+  (not core; `static-jwt` mode + recipes cover the no-IdP gap). **DX multipliers:**
+  `static-jwt` local mode ✅ (a PEM public key, full path offline) + auto-served
+  PRM ✅; **queued:** `afs auth doctor` (paste a token → see claims + resolved
+  context) and per-IdP recipe pages (WorkOS/Cognito/Auth0/Okta/Keycloak).
   *Exit:* authenticated end-to-end against **seamind-learn's WorkOS** issuer
   (real external IdP), with tenant isolation + scope denial verified live.
 - **M4+ — Accelerators & hardening** — `search_bedrock_kb`, `auth_cognito`,
