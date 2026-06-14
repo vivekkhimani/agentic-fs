@@ -9,6 +9,7 @@ entry-point group, and name it in the ladder. See `docs/swap-guides/` (extractio
 
 from __future__ import annotations
 
+import logging
 from importlib.metadata import entry_points
 
 from afs_core.contracts import Normalizer
@@ -24,6 +25,8 @@ from afs_server.extraction.tesseract import TesseractNormalizer
 from afs_server.extraction.text_native import TextNativeNormalizer
 from afs_server.extraction.textract import TextractNormalizer
 from afs_server.extraction.textract_analyze import TextractAnalyzeNormalizer
+
+logger = logging.getLogger("afs_server.extraction")
 
 _NORMALIZER_ENTRY_GROUP = "afs.normalizers"
 
@@ -79,19 +82,24 @@ def build_pipeline(
     """
     names = ladder or DEFAULT_LADDER
     normalizers = [_build_normalizer(n) for n in names]
+    if engine not in ("haystack", "ladder"):
+        raise ValueError(f"unknown AFS_PIPELINE_ENGINE {engine!r}; use 'haystack' or 'ladder'")
     if engine == "haystack":
         try:
             from afs_server.extraction.haystack_engine import HaystackExtractionPipeline
-        except ModuleNotFoundError as err:  # extra not installed
-            raise ValueError(
-                "AFS_PIPELINE_ENGINE=haystack requires the optional extra: "
-                "pip install 'afs-server[haystack]'"
-            ) from err
-        return HaystackExtractionPipeline(
-            normalizers, min_chars_per_page=min_chars_per_page, min_confidence=min_confidence
-        )
-    if engine != "ladder":
-        raise ValueError(f"unknown AFS_PIPELINE_ENGINE {engine!r}; use 'ladder' or 'haystack'")
+        except ModuleNotFoundError:
+            # The [haystack] extra isn't installed (e.g. the slim serving image).
+            # Fall back to the built-in ladder rather than failing — it walks the
+            # same rungs with the same gate. Install afs-server[haystack] for the
+            # graph engine (the worker image ships it).
+            logger.warning(
+                "pipeline_engine=haystack but afs-server[haystack] is not installed; "
+                "running the built-in ladder instead"
+            )
+        else:
+            return HaystackExtractionPipeline(
+                normalizers, min_chars_per_page=min_chars_per_page, min_confidence=min_confidence
+            )
     return ExtractionPipeline(
         normalizers,
         min_chars_per_page=min_chars_per_page,
