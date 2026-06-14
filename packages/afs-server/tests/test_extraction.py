@@ -84,9 +84,7 @@ _ANY = SourceDocument(filename="x", content_type=None, size=0, local_path=Path("
 
 async def test_pipeline_escalates_below_confidence_gate() -> None:
     # shaky OCR (0.5) is below the gate → fall through to the stronger rung (0.95).
-    pipe = ExtractionPipeline(
-        [_FakeRung("ocr", 0.5), _FakeRung("llm", 0.95)], min_confidence=0.6
-    )
+    pipe = ExtractionPipeline([_FakeRung("ocr", 0.5), _FakeRung("llm", 0.95)], min_confidence=0.6)
     outcome = await pipe.run(_ANY)
     assert outcome is not None and outcome.extractor == "llm"
 
