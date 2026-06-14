@@ -15,6 +15,7 @@ from afs_core.contracts import Normalizer
 from afs_server.extraction.docling import DoclingNormalizer
 from afs_server.extraction.docx import DocxNormalizer
 from afs_server.extraction.pdf import PdfNormalizer
+from afs_server.extraction.pdftables import PdfTablesNormalizer
 from afs_server.extraction.pipeline import ExtractionOutcome, ExtractionPipeline
 from afs_server.extraction.rapidocr import RapidOcrNormalizer
 from afs_server.extraction.runner import run_extraction
@@ -30,6 +31,7 @@ _NORMALIZER_ENTRY_GROUP = "afs.normalizers"
 _BUILTIN_NORMALIZERS = {
     "text_native": TextNativeNormalizer,
     "pdf": PdfNormalizer,
+    "pdftables": PdfTablesNormalizer,
     "docx": DocxNormalizer,
     "textract": TextractNormalizer,
     "tesseract": TesseractNormalizer,
