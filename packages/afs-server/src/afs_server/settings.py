@@ -112,6 +112,10 @@ class Settings(BaseSettings):
     # of namespaces. The claim itself may also be "*" to grant tenant-wide per token.
     oidc_namespaces_claim: str = "afs_namespaces"
     oidc_default_namespaces: str | None = None
+    # This server's own public base URL — used to advertise OAuth Protected
+    # Resource Metadata (RFC 9728) on the MCP mount so clients self-discover the
+    # authorization server. Defaults to localhost for dev/local.
+    public_base_url: str = "http://localhost:8080"
 
 
 def load_settings() -> Settings:

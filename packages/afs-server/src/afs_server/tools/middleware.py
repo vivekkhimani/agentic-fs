@@ -23,7 +23,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
 
 from afs_core.errors import AfsError
-from afs_server.auth import resolve_context
+from afs_server.auth import principal_from_access_token, resolve_dev_context
 
 if TYPE_CHECKING:
     from fastmcp.server.middleware import MiddlewareContext
@@ -62,10 +62,20 @@ class ToolMiddleware(Middleware):
     def _allowed(self, tool: Tool, ctx: TenantContext) -> bool:
         return tool.required_scopes <= ctx.scopes
 
+    def _principal(self) -> TenantContext:
+        """The calling principal for this request. In dev it's the static
+        principal; under oidc it's mapped from the bearer token FastMCP already
+        verified on the transport (via the ``RemoteAuthProvider``)."""
+        if self._settings.auth_mode == "dev":
+            return resolve_dev_context(self._settings)
+        from fastmcp.server.dependencies import get_access_token
+
+        return principal_from_access_token(get_access_token(), self._settings)
+
     async def on_list_tools(self, context: MiddlewareContext, call_next):
         tools = await call_next(context)
         try:
-            ctx = resolve_context(self._settings)
+            ctx = self._principal()
         except AfsError:
             return []  # unauthenticated → nothing is visible
         return [
@@ -76,7 +86,7 @@ class ToolMiddleware(Middleware):
         name = context.message.name
         tool = self._tools.get(name)
         try:
-            ctx = resolve_context(self._settings)
+            ctx = self._principal()
         except AfsError as err:
             raise ToolError(str(err)) from err
 

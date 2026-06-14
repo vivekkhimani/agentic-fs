@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 from afs_core.errors import AfsError
 from afs_server import __version__
+from afs_server.auth import build_token_verifier
 from afs_server.extraction import build_from_settings
 from afs_server.logging_config import configure_logging
 from afs_server.mcp import build_mcp
@@ -45,8 +46,13 @@ def create_app() -> FastAPI:
     fs_service = FsService(catalog, objects)
     scratch_service = ScratchService(catalog, objects)
     extraction_pipeline = build_from_settings(settings)
+    # One verifier shared by REST (bearer dep) and MCP (RemoteAuthProvider), so a
+    # single validation path + one JWKS cache. None in dev.
+    token_verifier = build_token_verifier(settings)
 
-    mcp_app = build_mcp(fs_service, settings, scratch_service).http_app(path="/")
+    mcp_app = build_mcp(
+        fs_service, settings, scratch_service, token_verifier=token_verifier
+    ).http_app(path="/")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -54,6 +60,7 @@ def create_app() -> FastAPI:
         app.state.catalog = catalog
         app.state.objects = objects
         app.state.extraction_pipeline = extraction_pipeline
+        app.state.token_verifier = token_verifier
         logger.info(
             "afs-server %s started (object_store=%s, catalog=%s, auth=%s)",
             __version__,
