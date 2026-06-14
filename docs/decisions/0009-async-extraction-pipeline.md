@@ -18,9 +18,10 @@ Extraction is an **asynchronous, S3-event-driven** stage.
   catalog row, then returns immediately. Nothing is parsed in the request.
 - **An S3 event drives the worker.** EventBridge fires on object-created under
   `tenants/` → **SQS** (+ DLQ) → an **extractor worker Lambda** running its own
-  image (the serving image **+ the `docling` extra**). The worker runs the same
-  `ExtractionPipeline`, writes the `derived/` pages, and flips the catalog row to
-  `extracted` / `catalog_only`.
+  **parametric** image (`Dockerfile.worker`, `AFS_EXTRAS` build arg). The slim
+  default ships `textract` (managed OCR, no torch); `docling` and other heavy
+  rungs are opt-in builds. The worker runs the same `ExtractionPipeline`, writes
+  the `derived/` pages, and flips the catalog row to `extracted` / `catalog_only`.
 - **The worker is the single extraction authority and it upserts from S3.** It
   reverses the object key (`keys.parse_key`) to `tenant/namespace/path`, so an
   object dropped *directly* into the bucket (`aws s3 sync`, a bulk load — bypassing
@@ -34,7 +35,8 @@ Extraction is an **asynchronous, S3-event-driven** stage.
 ## Why
 
 - **Heavy parsers off the request path** — Docling/OCR never block ingest; the
-  serving image stays ~190 MB while the worker image carries the ML deps.
+  serving image stays ~190 MB, and the worker image is sized to its rungs (~700 MB
+  for the managed-OCR default; ML deps only in an opt-in docling build).
 - **Ingest can't time out** — a 10k-file crawl just drops `pending` rows fast; the
   queue absorbs the extraction load and scales independently.
 - **Heal + bulk-load for free** — anything in S3 gets extracted, so the reconciler

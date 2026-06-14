@@ -70,10 +70,12 @@ jobs:
             exit 1
           fi
 
-  # The extractor-worker image (afs-server[docling]). Separate job so the heavy
-  # ML build runs in parallel and never blocks the serving deploy. Same ECR repo,
-  # a `worker-` tag (the repo enforces immutable tags). Rolls agentic-fs-worker
-  # once the ingestion module has created it (ADR 0009).
+  # The extractor-worker image. Builds the slim default (afs-server[textract] —
+  # managed OCR, no torch) via Dockerfile.worker's default build args; opt into
+  # heavier rungs (docling/rapidocr) with --build-arg AFS_EXTRAS=... in your own
+  # build. Separate job so it runs in parallel and never blocks the serving
+  # deploy. Same ECR repo, a `worker-` tag (the repo enforces immutable tags).
+  # Rolls agentic-fs-worker once the ingestion module has created it (ADR 0009).
   build-push-worker:
     runs-on: ubuntu-latest
     environment: sandbox
