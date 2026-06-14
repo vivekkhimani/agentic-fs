@@ -32,10 +32,13 @@ class Settings(BaseSettings):
     # infra); "async" stores the doc + a `pending` row and lets the extractor
     # worker complete it off an S3 event (ADR 0009). Default inline.
     extraction_mode: str = "inline"
-    # Comma-separated ladder of normalizer names, tried in order. The base image
-    # runs "text_native"; richer rungs are opt-in and need their extra (e.g.
-    # "text_native,docling" with afs-server[docling]).
-    extraction_ladder: str = "text_native"
+    # Comma-separated ladder of normalizer names, tried in order. The default is
+    # the lightweight, always-available rungs (pypdfium2/python-docx are base
+    # deps), so born-digital PDFs and Word docs extract inline with no extras —
+    # keep this in sync with extraction.DEFAULT_LADDER. Richer rungs are opt-in
+    # and need their extra (e.g. "text_native,pdf,docx,docling" with
+    # afs-server[docling]).
+    extraction_ladder: str = "text_native,pdf,docx"
 
     @property
     def extraction_ladder_names(self) -> list[str]:
