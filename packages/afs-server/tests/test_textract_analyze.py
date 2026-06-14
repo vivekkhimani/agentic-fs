@@ -14,6 +14,7 @@ from afs_core.testing import NormalizerConformance
 from afs_server.extraction.textract_analyze import (
     TextractAnalyzeNormalizer,
     _features_from_env,
+    _mean_line_confidence,
 )
 
 _PDF = Path(__file__).parent / "fixtures" / "sample.pdf"
@@ -151,6 +152,16 @@ def test_routing() -> None:
     assert n.accepts(_src("a.pdf", "application/pdf")) is True
     assert n.accepts(_src("a.tiff", None)) is True
     assert n.accepts(_src("a.docx", None)) is False
+
+
+def test_mean_line_confidence() -> None:
+    blocks = [
+        {"BlockType": "LINE", "Confidence": 90.0},
+        {"BlockType": "LINE", "Confidence": 70.0},
+        {"BlockType": "WORD", "Confidence": 10.0},  # not a LINE → ignored
+    ]
+    assert _mean_line_confidence(blocks) == pytest.approx(0.8)
+    assert _mean_line_confidence([{"BlockType": "LINE", "Text": "x"}]) is None  # no Confidence
 
 
 def test_features_from_env_default_and_drop(monkeypatch) -> None:

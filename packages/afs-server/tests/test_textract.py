@@ -60,6 +60,30 @@ async def test_ocrs_an_image_directly(tmp_path: Path) -> None:
     assert "hello from a scan" in result.pages[0].markdown
 
 
+async def test_reports_min_confidence() -> None:
+    class _WithConfidence:
+        def detect_document_text(self, Document: dict) -> dict:  # boto3 keyword
+            return {
+                "Blocks": [
+                    {"BlockType": "LINE", "Text": "a", "Confidence": 90.0},
+                    {"BlockType": "LINE", "Text": "b", "Confidence": 80.0},
+                ]
+            }
+
+    result = await TextractNormalizer(client=_WithConfidence()).normalize(
+        _src("s.pdf", "application/pdf", _PDF)
+    )
+    # each page mean = (90+80)/2/100 = 0.85; min across pages = 0.85
+    assert result.quality.confidence == pytest.approx(0.85)
+
+
+async def test_confidence_none_when_textract_omits_it() -> None:
+    result = await TextractNormalizer(client=_FakeTextract()).normalize(
+        _src("s.pdf", "application/pdf", _PDF)
+    )
+    assert result.quality.confidence is None
+
+
 def test_routing() -> None:
     n = TextractNormalizer(client=_FakeTextract())
     assert n.accepts(_src("a.pdf", "application/pdf")) is True

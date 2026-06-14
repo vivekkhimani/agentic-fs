@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from afs_core.models import SourceDocument
+from afs_core.models import NormalizedDocument, PageText, QualityReport, SourceDocument
 from afs_core.testing import NormalizerConformance
-from afs_server.extraction import DEFAULT_LADDER, build_pipeline
+from afs_server.extraction import DEFAULT_LADDER, ExtractionPipeline, build_pipeline
 from afs_server.extraction.text_native import TextNativeNormalizer
 from afs_server.settings import Settings
 
@@ -58,6 +58,49 @@ async def test_pipeline_empty_text_is_catalog_only(tmp_path: Path) -> None:
 def test_registry_rejects_unknown_normalizer() -> None:
     with pytest.raises(ValueError, match="unknown normalizer"):
         build_pipeline(["does-not-exist"])
+
+
+class _FakeRung:
+    """A normalizer that accepts anything and returns a fixed confidence."""
+
+    def __init__(self, name: str, confidence: float | None) -> None:
+        self.name = name
+        self._confidence = confidence
+
+    def accepts(self, doc: SourceDocument) -> bool:
+        return True
+
+    async def normalize(self, doc: SourceDocument) -> NormalizedDocument:
+        return NormalizedDocument(
+            pages=[PageText(number=1, markdown="some text")],
+            quality=QualityReport(
+                page_count=1, char_count=9, min_chars_per_page=9, confidence=self._confidence
+            ),
+        )
+
+
+_ANY = SourceDocument(filename="x", content_type=None, size=0, local_path=Path("x"))
+
+
+async def test_pipeline_escalates_below_confidence_gate() -> None:
+    # shaky OCR (0.5) is below the gate → fall through to the stronger rung (0.95).
+    pipe = ExtractionPipeline([_FakeRung("ocr", 0.5), _FakeRung("llm", 0.95)], min_confidence=0.6)
+    outcome = await pipe.run(_ANY)
+    assert outcome is not None and outcome.extractor == "llm"
+
+
+async def test_pipeline_confidence_gate_off_by_default() -> None:
+    # default min_confidence=0.0 → confidence never gates; the first rung wins.
+    pipe = ExtractionPipeline([_FakeRung("ocr", 0.5), _FakeRung("llm", 0.95)])
+    outcome = await pipe.run(_ANY)
+    assert outcome is not None and outcome.extractor == "ocr"
+
+
+async def test_pipeline_unreported_confidence_is_not_gated() -> None:
+    # a rung that doesn't report confidence (None) passes even with a gate set.
+    pipe = ExtractionPipeline([_FakeRung("text", None)], min_confidence=0.9)
+    outcome = await pipe.run(_ANY)
+    assert outcome is not None and outcome.extractor == "text"
 
 
 def test_settings_default_ladder_matches_default_ladder() -> None:

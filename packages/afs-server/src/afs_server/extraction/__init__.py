@@ -63,10 +63,23 @@ def _build_normalizer(name: str) -> Normalizer:
     raise ValueError(f"unknown normalizer {name!r}; available: {', '.join(available) or 'none'}")
 
 
-def build_pipeline(ladder: list[str] | None = None) -> ExtractionPipeline:
-    """Build the extraction pipeline from a ladder of normalizer names."""
+def build_pipeline(
+    ladder: list[str] | None = None,
+    *,
+    min_chars_per_page: int = 1,
+    min_confidence: float = 0.0,
+) -> ExtractionPipeline:
+    """Build the extraction pipeline from a ladder of normalizer names.
+
+    ``min_confidence`` (0..1) escalates a low-confidence result (e.g. shaky OCR) to
+    the next rung; 0.0 (default) never gates on confidence.
+    """
     names = ladder or DEFAULT_LADDER
-    return ExtractionPipeline([_build_normalizer(n) for n in names])
+    return ExtractionPipeline(
+        [_build_normalizer(n) for n in names],
+        min_chars_per_page=min_chars_per_page,
+        min_confidence=min_confidence,
+    )
 
 
 __all__ = ["ExtractionOutcome", "ExtractionPipeline", "build_pipeline", "run_extraction"]

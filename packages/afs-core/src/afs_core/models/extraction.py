@@ -41,6 +41,10 @@ class QualityReport(BaseModel):
     char_count: int
     ocr_used: bool = False
     min_chars_per_page: int = 0  # the lowest per-page char count seen
+    # Lowest per-page recognition confidence in [0, 1], when the rung can report it
+    # (e.g. OCR engines). ``None`` = not reported. The pipeline can escalate a
+    # low-confidence result to a stronger rung — see ExtractionPipeline.
+    confidence: float | None = None
 
 
 class NormalizedDocument(BaseModel):

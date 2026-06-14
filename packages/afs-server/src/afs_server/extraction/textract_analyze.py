@@ -79,11 +79,15 @@ class TextractAnalyzeNormalizer:
         )
 
         pages: list[PageText] = []
+        confidences: list[float] = []
         for index, image in enumerate(page_images):
-            resp = self._analyze(image)
-            markdown = _analyze_to_markdown(resp.get("Blocks", []))
+            blocks = self._analyze(image).get("Blocks", [])
+            markdown = _analyze_to_markdown(blocks)
             if not markdown.strip():
                 continue  # blank page; keep numbering contiguous
+            page_confidence = _mean_line_confidence(blocks)
+            if page_confidence is not None:
+                confidences.append(page_confidence)
             pages.append(
                 PageText(
                     number=len(pages) + 1,
@@ -102,6 +106,7 @@ class TextractAnalyzeNormalizer:
                 char_count=sum(char_counts),
                 ocr_used=True,
                 min_chars_per_page=min(char_counts),
+                confidence=min(confidences) if confidences else None,
             ),
         )
 
@@ -116,6 +121,12 @@ class TextractAnalyzeNormalizer:
 
             self._client = boto3.client("textract", region_name=self._region)
         return self._client
+
+
+def _mean_line_confidence(blocks: list[dict]) -> float | None:
+    """Mean LINE-block confidence in [0, 1], or None if Textract reported none."""
+    scores = [b["Confidence"] for b in blocks if b.get("BlockType") == "LINE" and "Confidence" in b]
+    return (sum(scores) / len(scores) / 100.0) if scores else None
 
 
 def _analyze_to_markdown(blocks: list[dict]) -> str:
