@@ -137,6 +137,14 @@ data "aws_iam_policy_document" "worker" {
     actions   = ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey"]
     resources = [var.kms_key_arn]
   }
+  # OCR for scanned pages (the textract rung). detect_document_text is resourceless
+  # in Textract's IAM model, so it can't be scoped to an ARN.
+  statement {
+    sid       = "TextractOcr"
+    effect    = "Allow"
+    actions   = ["textract:DetectDocumentText"]
+    resources = ["*"]
+  }
   # Drain the queue (the event-source mapping).
   statement {
     sid       = "ConsumeQueue"

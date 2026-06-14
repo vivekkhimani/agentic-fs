@@ -129,13 +129,19 @@ class IngestService:
         its row. Reads bytes from S3 — so an object dropped directly into the
         bucket (no row yet) is indexed too. Idempotent: derived keys are
         deterministic, so a redelivery overwrites rather than duplicates.
+
+        Acts as an **escalation** stage: a row already ``extracted`` (e.g. the
+        serving API did it inline with a lightweight rung) is skipped, so the
+        worker's heavier rungs only run on what's still ``pending``/``catalog_only``.
         """
+        existing = await self._catalog.get_entry(tenant_id, namespace, path)
+        if existing is not None and existing.extraction.status == "extracted":
+            return  # already done by the inline path; nothing to escalate
+
         key = keys.originals_key(tenant_id, namespace, path)
         data = await self._objects.get(key)
         stat = await self._objects.stat(key)
         content_type = _guess_type(path, stat.content_type if stat else None)
-
-        existing = await self._catalog.get_entry(tenant_id, namespace, path)
         entry_id = existing.entry_id if existing else new_ulid()
         extraction = await run_extraction(
             self._objects,

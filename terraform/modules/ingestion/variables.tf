@@ -44,9 +44,9 @@ variable "permissions_boundary_arn" {
 }
 
 variable "extraction_ladder" {
-  description = "AFS_EXTRACTION_LADDER for the worker — the docling image can run heavier rungs."
+  description = "AFS_EXTRACTION_LADDER for the worker — light rungs first, then OCR/heavy escalation."
   type        = string
-  default     = "text_native,docling"
+  default     = "text_native,pdf,docx,textract,docling"
 }
 
 variable "memory_mb" {

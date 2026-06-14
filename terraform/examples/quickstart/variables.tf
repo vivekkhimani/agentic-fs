@@ -51,9 +51,9 @@ variable "enable_ingestion" {
 }
 
 variable "extraction_mode" {
-  description = "AFS_EXTRACTION_MODE for the serving API: \"async\" (defer to the worker) or \"inline\" (extract in-request)."
+  description = "AFS_EXTRACTION_MODE for the serving API: \"inline\" (extract common files in-request via the light ladder; the worker OCR-escalates the rest) or \"async\" (defer all extraction to the worker)."
   type        = string
-  default     = "async"
+  default     = "inline"
 
   validation {
     condition     = contains(["inline", "async"], var.extraction_mode)
