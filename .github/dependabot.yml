@@ -1,0 +1,64 @@
+# Dependabot version updates. Grouped to keep PR noise low: minor + patch bumps
+# land as one PR per ecosystem each week, while majors come as individual PRs so
+# breaking changes get a deliberate review. Conventional-commit prefixes match the
+# repo's commit style. Docs:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  # --- Python workspace (uv): afs-core / afs-server / afs-connector-sdk ---
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore"
+    groups:
+      python:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # --- GitHub Actions (keeps the SHA-pinned actions + their version comments current) ---
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["ci", "dependencies"]
+    commit-message:
+      prefix: "chore"
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # --- Container base images (Dockerfile + Dockerfile.worker) ---
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore"
+    groups:
+      docker:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # --- Terraform providers + module sources across every root and module ---
+  - package-ecosystem: "terraform"
+    directories: ["/terraform/**"]
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels: ["infra", "dependencies"]
+    commit-message:
+      prefix: "chore"
+    groups:
+      terraform:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
