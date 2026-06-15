@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Hosting for the agenticfs.xyz marketing site:
+# Hosting for the agenticfs.xyz landing site:
 #   private S3  ->  CloudFront (OAC + ACM TLS)  ->  Route 53 alias records.
 # The hosted zone is created out-of-band (CLI) and referenced as a data source,
 # so this root never owns DNS delegation and survives an agentic-fs teardown.
@@ -106,7 +106,7 @@ resource "aws_cloudfront_distribution" "site" {
   default_root_object = "index.html"
   aliases             = local.aliases
   price_class         = "PriceClass_100"
-  comment             = "agenticfs.xyz marketing site"
+  comment             = "agenticfs.xyz landing site"
 
   origin {
     domain_name              = aws_s3_bucket.site.bucket_regional_domain_name

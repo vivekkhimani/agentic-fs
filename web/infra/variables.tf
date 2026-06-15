@@ -1,5 +1,5 @@
 variable "domain" {
-  description = "Apex domain for the marketing site (a Route 53 public hosted zone must already exist)."
+  description = "Apex domain for the landing site (a Route 53 public hosted zone must already exist)."
   type        = string
   default     = "agenticfs.xyz"
 }
