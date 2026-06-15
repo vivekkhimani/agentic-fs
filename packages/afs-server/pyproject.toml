@@ -39,7 +39,10 @@ dependencies = [
     "structlog>=24",
     # Lightweight extraction rungs (pure-Python / a small binary, no ML) so common
     # files extract synchronously in-request. Heavier docling stays the `docling` extra.
-    "pypdfium2>=4",
+    # Capped below the next major: pypdfium2 ships breaking API cleanups on major
+    # bumps (the v4->v5 rework). We track 5.x (verified against the pdf rung); a
+    # future v6 must be re-validated before it reaches consumers.
+    "pypdfium2>=4,<6",
     "python-docx>=1",
 ]
 
