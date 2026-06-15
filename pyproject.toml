@@ -40,7 +40,7 @@ dev = [
     # Pinned below 49 so a prebuilt macOS wheel is used in local dev (49.0.0's
     # wheel tags require a newer base than our toolchain resolves to). CI on
     # Linux is unaffected. moto only needs cryptography for request signing.
-    "cryptography>=43,<45",
+    "cryptography>=49.0.0,<50",
 ]
 # Maintainer-only release tooling — not synced by a normal `uv sync`. The
 # commit-msg pre-commit hook brings its own commitizen, so contributors don't
