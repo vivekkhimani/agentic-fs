@@ -58,8 +58,48 @@ class GrepResponse(BaseModel):
     """Bounded two-stage grep results over a namespace's derived text."""
 
     matches: list[GrepMatch]
+    files: list[str] = []  # populated instead of matches in files_with_matches mode
     files_searched: int
     truncated: bool  # a budget (files/matches/bytes) was hit — narrow the query
+
+
+class TreeResponse(BaseModel):
+    """An indented directory tree of a namespace (like ``ls -R``/``tree``)."""
+
+    tree: str  # indented text; dirs end with "/"
+    dirs: int
+    files: int
+    truncated: bool  # the entry cap was hit — narrow with a prefix
+
+
+class FindItem(BaseModel):
+    path: str
+    size: int
+    content_type: str
+    status: str  # extraction status
+    updated_at: str  # ISO-8601
+
+
+class FindResponse(BaseModel):
+    """Catalog entries matching a glob + metadata filters (the ``find`` to grep)."""
+
+    items: list[FindItem]
+    truncated: bool
+
+
+class OutlineHeading(BaseModel):
+    level: int  # 1-6 (markdown heading depth)
+    title: str
+    page: int  # 1-based derived page the heading is on
+
+
+class OutlineResponse(BaseModel):
+    """A document's structure — its markdown headings + page map (a symbol map)."""
+
+    path: str
+    page_count: int
+    headings: list[OutlineHeading]
+    truncated: bool  # heading cap or page cap hit
 
 
 class ScratchWriteResult(BaseModel):
