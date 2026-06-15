@@ -29,7 +29,7 @@ dev = [
     { name = "fsspec", specifier = ">=2024.6" },
     { name = "haystack-ai", specifier = ">=2.10" },
     { name = "httpx", specifier = ">=0.27" },
-    { name = "moto", extras = ["s3"], specifier = ">=5" },
+    { name = "moto", extras = ["s3"], specifier = ">=5.2.2" },
     { name = "pdfplumber", specifier = ">=0.11" },
     { name = "pillow", specifier = ">=10" },
     { name = "pytest", specifier = ">=8" },
@@ -59,7 +59,7 @@ wheels = [
 
 [[package]]
 name = "afs-connector-sdk"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "packages/afs-connector-sdk" }
 dependencies = [
     { name = "afs-core" },
@@ -93,7 +93,7 @@ provides-extras = ["aws", "gdrive", "llamahub"]
 
 [[package]]
 name = "afs-core"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "packages/afs-core" }
 dependencies = [
     { name = "pydantic" },
@@ -115,7 +115,7 @@ provides-extras = ["testing"]
 
 [[package]]
 name = "afs-server"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "packages/afs-server" }
 dependencies = [
     { name = "afs-core" },
