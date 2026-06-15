@@ -86,19 +86,61 @@ Component = "<...>"          # or Example = "<...>"
 Env       = "<sandbox|global>"
 ```
 
-To tear the project down cleanly:
+### Teardown runbook (tested)
 
-1. `terraform destroy` each root in **reverse dependency order**: examples first,
-   then `global/ci-roles`, last `global/bootstrap` (its bucket has
-   `prevent_destroy = true` — remove that guard deliberately, or empty + delete
-   the bucket by hand).
-2. Verify nothing is left behind by listing everything tagged `Project=agentic-fs`
-   (AWS Resource Groups / Tag Editor, or:
-   `aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=agentic-fs`).
+Destroy in **reverse dependency order**: the example root first, then
+`global/ci-roles`, last the state bucket. A few resources block a clean
+`terraform destroy` and need a manual pre-step first (these are safety features,
+not bugs — clearing them is a deliberate act):
 
-Because the tag is uniform across the whole footprint, that one query is the
-definitive "did we get everything?" check — the reason teardown was a design
-goal from day one.
+```bash
+ACCOUNT_ID=<your-account-id>
+BUCKET="agentic-fs-terraform-state-${ACCOUNT_ID}"
+
+# 1. Clear the destroy blockers (each would otherwise fail the destroy):
+#    a. DynamoDB deletion protection (catalog default) blocks DeleteTable.
+aws dynamodb update-table --table-name agentic-fs-catalog --no-deletion-protection-enabled
+#    b. The data bucket is versioned with no force_destroy → purge ALL versions
+#       AND delete markers (jmespath can't concat the two lists, so do each):
+for k in Versions DeleteMarkers; do
+  aws s3api delete-objects --bucket "agentic-fs-data-${ACCOUNT_ID}" --delete \
+    "$(aws s3api list-object-versions --bucket "agentic-fs-data-${ACCOUNT_ID}" \
+        --query "{Objects: ${k}[].{Key:Key,VersionId:VersionId}}" --output json)"
+done
+#    c. ECR repo with images blocks repo deletion → delete the images:
+aws ecr batch-delete-image --repository-name agentic-fs-api \
+  --image-ids "$(aws ecr list-images --repository-name agentic-fs-api --query imageIds --output json)"
+
+# 2. Destroy the application footprint, then the CI roles:
+( cd examples/quickstart && terraform init -backend-config="bucket=${BUCKET}" \
+  && terraform destroy -auto-approve -var aws_account_id="${ACCOUNT_ID}" -var aws_region=us-east-1 )
+( cd global/ci-roles && terraform init -backend-config="bucket=${BUCKET}" \
+  && terraform destroy -auto-approve -var aws_account_id="${ACCOUNT_ID}" -var state_bucket_name="${BUCKET}" )
+
+# 3. The state bucket is circular (it holds every root's state), so it can't be
+#    terraform-destroyed cleanly — empty its versions + delete it by hand, last:
+for k in Versions DeleteMarkers; do
+  aws s3api delete-objects --bucket "${BUCKET}" --delete \
+    "$(aws s3api list-object-versions --bucket "${BUCKET}" \
+        --query "{Objects: ${k}[].{Key:Key,VersionId:VersionId}}" --output json)"
+done
+aws s3api delete-bucket --bucket "${BUCKET}"
+
+# 4. Verify — the uniform tag is the definitive "did we get everything?" check:
+aws resourcegroupstaggingapi get-resources --tag-filters Key=Project,Values=agentic-fs
+```
+
+Notes:
+- **The CMK lingers in `PendingDeletion`.** AWS never deletes a KMS key
+  immediately; `terraform destroy` schedules it (7–30 day window) and it stays
+  tagged until then. Expected, not a leftover.
+- **`global/ci-roles` does not own the GitHub OIDC provider** (it's a data
+  source), so destroying it leaves the account's OIDC provider in place — anything
+  else relying on it (e.g. a separate site-deploy role) keeps working.
+- **Making this one-command** would mean adding gated `force_destroy` (storage) /
+  `force_delete` (ecr) toggles and a teardown-time `deletion_protection=false` —
+  tracked as a `help wanted` issue; the manual pre-steps above are the safe
+  default until then.
 
 ## Conventions
 
