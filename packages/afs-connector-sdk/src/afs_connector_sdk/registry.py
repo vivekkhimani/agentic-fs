@@ -22,10 +22,16 @@ def _builtins() -> dict[str, object]:
     # client for gdrive) aren't needed just to load the registry or use another
     # connector. The connector modules themselves import those deps lazily too.
     from afs_connector_sdk.connectors.gdrive import GDriveConnector
+    from afs_connector_sdk.connectors.llamahub import LlamaHubConnector
     from afs_connector_sdk.connectors.local import LocalConnector
     from afs_connector_sdk.connectors.s3 import S3Connector
 
-    return {"local": LocalConnector, "s3": S3Connector, "gdrive": GDriveConnector}
+    return {
+        "local": LocalConnector,
+        "s3": S3Connector,
+        "gdrive": GDriveConnector,
+        "llamahub": LlamaHubConnector,
+    }
 
 
 def build_connector(name: str, source: str, **options: str) -> Connector:
