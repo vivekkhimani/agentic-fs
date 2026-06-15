@@ -75,7 +75,7 @@ Status against each:
 | Catalog (list/glob/stat index) | `catalog_dynamodb` (default) / `catalog_postgres` | ✅ done | The **derived index** of S3 — navigation without O(corpus) S3 LISTs; healable; **swappable** |
 | Serving compute (MCP+REST) | `compute_lambda` (default) / `compute_fargate` | ✅ done (live) | **MCP-first, agent-shaped** — streaming Function URL (AWS_IAM); OAuth resource server + enforcement boundary still to come |
 | Ingest → extract → heal | `ingestion` ✅ | **Hybrid extraction** (ADR 0009): serving extracts common files **inline** (light `text_native,pdf,docx` ladder, instant) while the **S3-event worker** OCR-escalates the rest — EventBridge → SQS (+DLQ) → worker Lambda. The worker image is **parametric** (`Dockerfile.worker`, `AFS_EXTRAS` build arg): the slim default runs `text_native,pdf,docx,textract` (~700 MB, managed OCR, no torch); `docling` is an opt-in heavy build. A rung named without its extra declines safely. Skips rows already extracted inline. **Structured logging** (structlog → JSON in CloudWatch, console in dev; `AFS_LOG_LEVEL`) surfaces declines/escalation/per-doc progress; the **DLQ** is locked to the extract queue with a redrive-allow policy (move-back after a fix). The scheduled **reconciler** ([ADR 0011](decisions/0011-reconciliation.md), EventBridge rate → Lambda) heals catalog↔S3 drift: missing/stale/re-added objects are enqueued for the worker, orphaned rows are **soft-deleted** (tombstones revive if the file returns) ✅. CloudWatch **alarms** now ship in the `observability` module (below) ✅ |
-| Connectors (source → ingest) | `afs-connector-sdk` | 🔧 local + S3 + Drive | **Point it at your documents** — client-side crawlers push to the ingest API, with **incremental sync** (version-skip + delta cursors, [ADR 0008](decisions/0008-incremental-sync.md)) so big sources aren't re-crawled wholesale. Local FS / S3 / **Google Drive** (OAuth + export) ship; Drive's delta `changes.list` + SharePoint are next |
+| Connectors (source → ingest) | `afs-connector-sdk` | 🔧 local + S3 + Drive | **Point it at your documents** — client-side crawlers push to the ingest API, with **incremental sync** (version-skip + delta cursors, [ADR 0008](decisions/0008-incremental-sync.md)) so big sources aren't re-crawled wholesale. Local FS / S3 / **Google Drive** (OAuth + export) ship. **Next: a `LlamaHub reader → Connector` adapter** ([ADR 0014](decisions/0014-connector-extraction-ecosystem-adapters.md)) — one bridge unlocks 300+ community readers (SharePoint/Confluence/Notion/…), ahead of hand-writing each; thin contracts stay the seam, ecosystems tie in as adapters |
 | Semantic search (optional) | `search_bedrock_kb` | M3+ | **Grep is the floor; search is an accelerator you switch on** |
 | Auth — OAuth 2.1 **resource server** (core) | afs-server (`auth_mode=oidc`) | M4 🔜 | **Bring your own IdP** — we validate tokens + map claims, never issue them ([ADR 0013](decisions/0013-auth-oauth-resource-server.md)); works with WorkOS/Cognito/Auth0/Okta/Keycloak |
 | Auth — IdP (optional, greenfield only) | `auth_cognito` | opt | Batteries-included user pool for users with no IdP, $0 under free tier — never required |
@@ -180,12 +180,14 @@ it — so the system is demoable at every step (plan §15).
   `compute_fargate`/`network`, `security_guardduty`,
   `cache_elasticache` (optional Redis/Valkey read/grep cache, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md));
   the `hardened`/`full`/`byo-postgres` example roots.
-- **Future swap — `fsspec` ObjectStore adapter** — a thin `ObjectStore` over
-  [fsspec](https://filesystem-spec.readthedocs.io) would, with one adapter,
-  certify the contract against GCS / Azure Blob / HDFS / local / many more —
-  broadening "bring your own storage" beyond the S3-compatible set without a
-  per-backend store. Implement → run the conformance kit → register under
-  `afs.object_stores` (ADR 0002), same path as any other backend.
+- **Ecosystem adapters (don't reinvent the edges)** — [ADR 0014](decisions/0014-connector-extraction-ecosystem-adapters.md):
+  keep our thin `Connector`/`Normalizer` contracts as the stable seam and tie big
+  OSS ecosystems in behind them. **`LlamaHub reader → Connector`** (300+ sources,
+  highest leverage) and **`fsspec → ObjectStore`** (GCS/Azure/HDFS/local with one
+  adapter) — each implement → conformance-certify → register under its
+  entry-point group (ADR 0002), shipped as optional extras so the core stays lean.
+  Airbyte/Singer deliberately *not* a core dep (record-shaped ELT; interop via
+  land-in-S3 + the S3 connector instead).
 
 ## How the pipeline keeps us safe as we add each piece
 
