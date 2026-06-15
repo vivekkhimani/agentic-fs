@@ -4,6 +4,21 @@ All notable changes to agentic-fs are documented here. The project follows
 [semantic versioning](https://semver.org); the three packages
 (`afs-core`, `afs-server`, `afs-connector-sdk`) version together.
 
+## 1.0.1
+
+Maintenance release: dependency hygiene and a container base-image bump. No
+public API changes.
+
+- **Dependencies**: raised floors for `uvicorn[standard]` (>=0.49), `fastapi`
+  (>=0.137), and `pdfplumber` (>=0.11.10), and capped `pypdfium2` to `>=4,<6`
+  (it ships breaking API cleanups on majors; the `pdf` rung is verified against
+  5.x). Lockfile regenerated.
+- **Container images**: API and worker images move from Python 3.12 to 3.13
+  across every build stage (builder and runtime kept in lockstep so manylinux
+  wheels stay ABI-compatible). The worker's site-packages COPY now globs the
+  Python minor so future bumps can't strand the path.
+- **CI**: prebuilt API + worker images publish to GHCR on each release tag.
+
 ## 1.0.0
 
 First public release.

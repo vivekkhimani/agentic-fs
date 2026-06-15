@@ -1,6 +1,6 @@
 [project]
 name = "afs-core"
-version = "1.0.0"
+version = "1.0.1"
 description = "agentic-fs core contracts, DTOs, key scheme, and conformance kits. Depends on pydantic only."
 readme = "README.md"
 requires-python = ">=3.12"

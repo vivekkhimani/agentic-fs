@@ -1,6 +1,6 @@
 [project]
 name = "afs-connector-sdk"
-version = "1.0.0"
+version = "1.0.1"
 description = "agentic-fs connector SDK: crawl a source and ingest into agentic-fs. Ships the fs-crawler CLI plus Local FS and S3 connectors."
 readme = "README.md"
 requires-python = ">=3.12"

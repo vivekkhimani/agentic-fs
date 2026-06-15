@@ -1,6 +1,6 @@
 [project]
 name = "afs-server"
-version = "1.0.0"
+version = "1.0.1"
 description = "agentic-fs server: stores, services, REST + MCP. Implements the afs-core contracts."
 readme = "README.md"
 requires-python = ">=3.12"
