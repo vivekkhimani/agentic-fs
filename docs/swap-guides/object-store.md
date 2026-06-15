@@ -54,9 +54,26 @@ contract and register it:
 The server never imports your package directly — it discovers it through the
 `afs.object_stores` entry-point group. No fork.
 
+## Non-S3 storage, no code: the `fsspec` backend
+
+For storage that *isn't* S3-compatible — **GCS, Azure Blob, HDFS, local disk, and
+[many more](https://filesystem-spec.readthedocs.io)** — use the built-in `fsspec`
+backend ([ADR 0014](../decisions/0014-connector-extraction-ecosystem-adapters.md)).
+One adapter, certified by the same conformance kit, over any fsspec filesystem:
+
+```bash
+pip install 'afs-server[fsspec]' gcsfs        # + the backend you target (gcsfs/adlfs/…)
+export AFS_OBJECT_STORE_BACKEND=fsspec
+export AFS_FSSPEC_ROOT=gcs://my-bucket/agentic-fs      # or az://container/prefix, file:///var/lib/agentic-fs
+```
+
+Credentials come from the backend's own env/config (e.g. `GOOGLE_APPLICATION_CREDENTIALS`).
+Caveat: presigned upload/download is backend-dependent — where the backend
+supports signing it's used, otherwise use the server-side read/write path.
+
 ## Contract reference
 
 `afs_core/contracts/objects.py`. Certified by
 `afs_core.testing.ObjectStoreConformance`. The reference impls are
-`afs_server.stores.objects_s3.S3ObjectStore` (production) and
-`afs_core.testing.InMemoryObjectStore` (tests).
+`afs_server.stores.objects_s3.S3ObjectStore` (production), `objects_fsspec.FsspecObjectStore`
+(GCS/Azure/HDFS/local via fsspec), and `afs_core.testing.InMemoryObjectStore` (tests).

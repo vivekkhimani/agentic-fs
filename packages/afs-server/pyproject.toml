@@ -47,6 +47,9 @@ dependencies = [
 afs = "afs_server.cli:main"
 
 [project.optional-dependencies]
+# fsspec object-store adapter (ADR 0014): one store over GCS/Azure/HDFS/local/etc.
+# fsspec core only — add the matching backend per target (gcsfs, adlfs, …).
+fsspec = ["fsspec>=2024.6"]
 # Rich extraction (PDF / Office / images) via Docling — pulls heavy ML deps, so
 # it's opt-in. Enable the rung with AFS_EXTRACTION_LADDER=text_native,docling.
 # torch/torchvision are listed explicitly (they're docling transitives) so the
