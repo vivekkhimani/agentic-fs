@@ -14,7 +14,7 @@ The MCP spec (2025-11-25) formally classifies an MCP server as an **OAuth 2.1
 resource server**: it *accepts and validates* access tokens, advertises where to
 get them (`WWW-Authenticate` → Protected Resource Metadata, RFC 9728), and relies
 on RFC 8707 resource binding — it does **not** issue tokens. We want agentic-fs
-usable by us (Seamind, on WorkOS) **and** by external orgs on their own IdPs
+usable by a team already on WorkOS **and** by external orgs on their own IdPs
 (Cognito, Auth0, Okta, Keycloak, …), and reachable from arbitrary MCP clients.
 
 Two categories of OSS exist and the distinction decides the design:

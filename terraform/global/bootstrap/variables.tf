@@ -1,5 +1,5 @@
 variable "aws_account_id" {
-  description = "AWS account ID that hosts agentic-fs infrastructure (shared with the existing Seamind account during the trial phase)."
+  description = "AWS account ID that hosts agentic-fs infrastructure."
   type        = string
   default     = "002988089284"
 }

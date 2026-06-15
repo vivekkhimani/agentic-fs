@@ -1,14 +1,10 @@
 name: Image
 
+# Build + push the images and roll the Lambdas. Deploy is decoupled from merge
+# (OSS-safe): this runs ONLY on a deliberate manual dispatch, never automatically
+# on a push, and only in the canonical repo — so a merge (or a fork) never
+# pushes to anyone's ECR or rolls anyone's functions.
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'packages/**'
-      - 'Dockerfile'
-      - 'Dockerfile.worker'
-      - '.dockerignore'
-      - '.github/workflows/image.yml'
   workflow_dispatch: {}
 
 permissions:
@@ -21,6 +17,7 @@ env:
 
 jobs:
   build-push-deploy:
+    if: github.repository_owner == 'vivekkhimani'
     runs-on: ubuntu-latest
     # The image-push role's OIDC trust is restricted to this environment.
     environment: sandbox
@@ -77,6 +74,7 @@ jobs:
   # deploy. Same ECR repo, a `worker-` tag (the repo enforces immutable tags).
   # Rolls agentic-fs-worker once the ingestion module has created it (ADR 0009).
   build-push-worker:
+    if: github.repository_owner == 'vivekkhimani'
     runs-on: ubuntu-latest
     environment: sandbox
     env:

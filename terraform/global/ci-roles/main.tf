@@ -24,8 +24,8 @@
 # on the read side (so a plan never fails on a missing read permission), tight
 # on the write side, which is the part that matters.
 #
-# The GitHub OIDC provider already exists in this account (shared, created by
-# the existing Seamind bootstrap); we reference it as a data source rather than
+# The GitHub OIDC provider may already exist in this account (it's an
+# account-global singleton); we reference it as a data source rather than
 # creating a second one. Trust is per-role, so a new role for this repo is all
 # that is required.
 # ---------------------------------------------------------------------------
