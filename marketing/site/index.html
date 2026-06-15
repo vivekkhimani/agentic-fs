@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>agentic-fs — a filesystem for AI agents, over your own S3</title>
+    <meta
+      name="description"
+      content="Filesystem-style access to your documents for AI agents — list / glob / grep / read over your own S3, via MCP. Multi-tenant, one terraform apply, ~$2/mo idle, every layer swappable. Apache-2.0."
+    />
+    <meta property="og:title" content="agentic-fs" />
+    <meta
+      property="og:description"
+      content="A filesystem for AI agents, over your own S3. MCP-first, multi-tenant, swappable, ~$2/mo idle. Open source (Apache-2.0)."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://agenticfs.xyz" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'&gt;&lt;text y='14' font-size='14'&gt;%F0%9F%97%82%EF%B8%8F&lt;/text&gt;&lt;/svg&gt;"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div class="prompt"><span class="sigil">$</span> agentic-fs</div>
+        <h1>A filesystem for AI agents — over your own S3.</h1>
+        <p class="tagline">
+          <code>list</code> / <code>glob</code> / <code>grep</code> /
+          <code>tree</code> / ranged <code>read</code> over your documents,
+          exposed through <strong>MCP</strong>. Multi-tenant, one
+          <code>terraform apply</code>, ~<strong>$2/mo</strong> idle, and every
+          stateful layer is swappable.
+        </p>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/vivekkhimani/agentic-fs">GitHub repo →</a>
+          <a class="btn" href="#contribute">Open to contributions</a>
+        </div>
+        <p class="meta">Apache-2.0 · Python + Terraform · AWS-native</p>
+      </header>
+
+      <section>
+        <h2>What it is</h2>
+        <p>
+          agentic-fs gives an AI agent <em>filesystem-style</em> access to an
+          organization's documents — not a chat box bolted onto a vector store.
+          Your files stay in <strong>your S3</strong> (the single source of
+          truth); a derived catalog makes <code>list</code>/<code>glob</code>/<code>stat</code>
+          fast at scale; and the agent navigates with the same loop a coding
+          agent uses on a repo. Documents (PDF, Office, …) are extracted to text
+          so <code>grep</code> and <code>read</code> work on their contents.
+        </p>
+      </section>
+
+      <section>
+        <h2>Why it's shaped this way</h2>
+        <ul class="grid">
+          <li><strong>MCP-first.</strong> A bounded, scoped tool surface any MCP client can attach to — REST too.</li>
+          <li><strong>Grep is the floor.</strong> Two-stage, budgeted search over extracted text. Semantic search is an opt-in accelerator, not a dependency.</li>
+          <li><strong>Multi-tenant &amp; secure.</strong> SSE-KMS everywhere, scope/namespace enforcement, an IdP-agnostic OAuth 2.1 resource server (bring your own IdP).</li>
+          <li><strong>Healable.</strong> S3 is canonical; the catalog is derived and reconciles back to S3.</li>
+          <li><strong>~$2/mo idle.</strong> Serverless by default — Lambda + S3 + DynamoDB. You pay for what you use.</li>
+          <li><strong>Swappable everything.</strong> Object store, catalog, compute, extraction, connectors, auth — each a small contract with a conformance kit.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>The tool surface</h2>
+        <pre class="tools">
+whoami        who am I — tenant, scopes, namespaces
+fs_list       list a namespace
+fs_tree       directory tree (ls -R)
+fs_glob       path globs (**/*.pdf)
+fs_find       filter by type / size / mtime / status
+fs_grep       two-stage regex over extracted text
+fs_outline    a document's heading + page map
+fs_read       ranged read, or by section
+fs_tables     pull tables as structured rows
+fs_diff       diff two documents
+scratch_*     a per-principal scratch workspace</pre>
+        <p class="muted">Tools are pluggable — add your own as an entry point; it inherits scope-enforcement, budgets, and audit for free.</p>
+      </section>
+
+      <section>
+        <h2>Install</h2>
+        <pre class="install"><span class="c"># the contracts (pydantic only)</span>
+pip install afs-core
+<span class="c"># the service: stores, extraction, FastAPI + MCP mount, the afs CLI</span>
+pip install afs-server
+<span class="c"># crawl your docs in (Local / S3 / Drive / LlamaHub readers)</span>
+pip install afs-connector-sdk</pre>
+        <p class="links">
+          <a href="https://pypi.org/project/afs-core/">afs-core</a> ·
+          <a href="https://pypi.org/project/afs-server/">afs-server</a> ·
+          <a href="https://pypi.org/project/afs-connector-sdk/">afs-connector-sdk</a>
+          &nbsp;on PyPI · deploy with one <code>terraform apply</code>
+          (<a href="https://github.com/vivekkhimani/agentic-fs/tree/master/terraform">terraform/</a>).
+        </p>
+      </section>
+
+      <section id="contribute">
+        <h2>Open to contributions</h2>
+        <p>
+          The core is built and the platform is designed to grow without forking —
+          new stores, connectors, extractors, and MCP tools are
+          <em>implement + register</em>, certified by the same conformance kits.
+          Good places to start are filed and labelled:
+        </p>
+        <ul class="grid">
+          <li><a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">good first issues</a> — scoped, self-contained.</li>
+          <li><a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">help wanted</a> — Redis/Valkey cache, Fargate, GuardDuty, a Postgres catalog, semantic search, more connectors.</li>
+          <li><a href="https://github.com/vivekkhimani/agentic-fs/tree/master/docs/swap-guides">swap guides</a> &amp; <a href="https://github.com/vivekkhimani/agentic-fs/tree/master/docs/decisions">decision records</a> — how the seams work and why.</li>
+        </ul>
+        <p class="muted">Read <a href="https://github.com/vivekkhimani/agentic-fs/blob/master/docs/build-progress.md">build-progress.md</a> for what's done, what's next, and the thinking behind each slice.</p>
+      </section>
+
+      <section id="roadmap">
+        <h2>What I'd love to do next</h2>
+        <p>
+          The core is built; these are the high-value ideas on deck. Each is a
+          filed, scoped issue with acceptance criteria — pick one and run with it.
+        </p>
+        <ul class="grid">
+          <li>
+            <strong>More backends</strong><br />
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/77">Postgres catalog</a> ·
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/78">Redis/Valkey cache</a>
+          </li>
+          <li>
+            <strong>Serving &amp; scale</strong><br />
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/73">always-on Fargate</a> ·
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/74">private VPC/network</a>
+          </li>
+          <li>
+            <strong>Search</strong><br />
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/79">no-infra <code>fs_search</code></a> ·
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/72">Bedrock KB</a>
+          </li>
+          <li>
+            <strong>Security &amp; auth</strong><br />
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/76">S3 malware scan</a> ·
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/75">managed Cognito IdP</a>
+          </li>
+          <li>
+            <strong>Connectors</strong><br />
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/80">Google Drive incremental delta</a>
+          </li>
+          <li>
+            <strong>Good first issue</strong><br />
+            <a href="https://github.com/vivekkhimani/agentic-fs/issues/81">ripgrep-parity grep flags</a>
+          </li>
+        </ul>
+        <p class="muted">
+          See the <a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">full open list</a>
+          or open a new idea — discussion welcome.
+        </p>
+      </section>
+
+      <section id="credits">
+        <h2>Acknowledgments</h2>
+        <p>agentic-fs stands on ideas others published first:</p>
+        <ul class="grid">
+          <li><a href="https://www.mintlify.com/blog/how-we-built-a-virtual-filesystem-for-our-assistant">Mintlify — a virtual filesystem for their assistant</a>: two-stage grep, claims-pruned path tree, read-only semantics.</li>
+          <li>Anthropic — <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">effective context engineering</a> &amp; <a href="https://www.anthropic.com/engineering/code-execution-with-mcp">code execution with MCP</a>.</li>
+          <li>"Grep is the floor" — <a href="https://vadim.blog/claude-code-no-indexing/">Claude Code dropped indexing</a> · <a href="https://jxnl.co/writing/2025/09/11/why-grep-beat-embeddings-in-our-swe-bench-agent-lessons-from-augment/">why grep beat embeddings</a>.</li>
+          <li>Built on <a href="https://modelcontextprotocol.io">MCP</a> · <a href="https://filesystem-spec.readthedocs.io">fsspec</a> · <a href="https://llamahub.ai/">LlamaHub</a> · <a href="https://github.com/DS4SD/docling">Docling</a>.</li>
+        </ul>
+        <p class="muted">Fuller reference list in the <a href="https://github.com/vivekkhimani/agentic-fs/blob/master/docs/agentic-fs-oss-plan.md#references">design doc</a>.</p>
+      </section>
+
+      <footer>
+        <p>
+          Built by <a href="https://vivekkhimani.github.io">Vivek Khimani</a> ·
+          <a href="mailto:vivekkhimani07@gmail.com">vivekkhimani07@gmail.com</a> ·
+          <a href="https://github.com/vivekkhimani/agentic-fs">github.com/vivekkhimani/agentic-fs</a>
+        </p>
+        <p class="muted">Apache-2.0.</p>
+      </footer>
+    </main>
+  </body>
+</html>
