@@ -6,12 +6,13 @@ documents in **your S3**, exposed through **MCP** (and REST). It's multi-tenant,
 deploys with **one `terraform apply`**, costs ~**$2/month idle**, and **every
 stateful layer is swappable**.
 
-> **Status: early, in active development.** Private repo for now; the public OSS
-> release and PyPI/module publishing are being prepped (see
-> [`docs/build-progress.md`](docs/build-progress.md)). The full loop is **live on
-> AWS**: ingest, extract, catalog, and the MCP/REST read surface, with scheduled
-> heal-from-S3 and high-signal alarms. License: Apache-2.0 (intended). Background
-> and rationale live in [`docs/agentic-fs-oss-plan.md`](docs/agentic-fs-oss-plan.md).
+> **Status: early, in active development.** v1.0.0 is published to PyPI and the
+> repo is public; contributions are welcome (see the
+> [open issues](https://github.com/vivekkhimani/agentic-fs/issues) and
+> [`docs/build-progress.md`](docs/build-progress.md)). The full loop runs on
+> **AWS**: ingest, extract, catalog, and the MCP/REST read surface, with scheduled
+> heal-from-S3 and high-signal alarms. License: Apache-2.0. Background and
+> rationale live in [`docs/agentic-fs-oss-plan.md`](docs/agentic-fs-oss-plan.md).
 
 ## What an agent gets
 
