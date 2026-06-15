@@ -88,5 +88,26 @@ fs-crawler --connector s3 --source s3://bucket/reports/ --api-url "$URL" \
     --namespace reports --auth sigv4 --region us-east-1
 ```
 
+## Reuse the LlamaHub ecosystem (`llamahub`)
+
+Rather than hand-write every source, the **`llamahub`** connector adapts any
+[LlamaHub](https://llamahub.ai/) reader (300+: SharePoint, Confluence, Notion,
+Slack, …) — see [ADR 0014](../decisions/0014-connector-extraction-ecosystem-adapters.md).
+A reader already *extracts*, so this is a **pre-extracted** connector: it ingests
+each `Document`'s text as `text/markdown` (the `text_native` rung passes it
+through), not the original bytes. Install `[llamahub]` plus the per-source reader,
+then point `--source` at the reader's dotted class path:
+
+```bash
+pip install 'afs-connector-sdk[llamahub]' llama-index-readers-notion
+fs-crawler --connector llamahub \
+    --source llama_index.readers.notion.NotionPageReader \
+    --opt integration_token=… --api-url "$URL" --namespace kb
+```
+
+For readers needing typed constructor args, build it programmatically and pass
+`reader=` to `LlamaHubConnector`. Use a native connector (local/s3/gdrive) when you
+want the original bytes in S3 + our own extraction ladder.
+
 Reference: `afs_connector_sdk`, contract in `afs_core/contracts/connector.py`,
 decision in [`0007-connector-model.md`](../decisions/0007-connector-model.md).

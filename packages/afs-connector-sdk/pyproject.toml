@@ -32,6 +32,11 @@ dependencies = [
 aws = ["boto3>=1.34"]
 # The Google Drive connector: the Drive API client + the installed-app OAuth flow.
 gdrive = ["google-api-python-client>=2", "google-auth-oauthlib>=1"]
+# The LlamaHub adapter: llama-index-core gives BaseReader/Document. Add the
+# per-source reader package too, e.g. `pip install afs-connector-sdk[llamahub]
+# llama-index-readers-notion`. The adapter itself is duck-typed, so this extra is
+# only needed to actually run a reader.
+llamahub = ["llama-index-core>=0.11"]
 
 [project.scripts]
 fs-crawler = "afs_connector_sdk.cli:main"
