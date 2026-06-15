@@ -3,11 +3,10 @@ name: Terraform
 # Account-free CI: fmt + validate + tflint + trivy, with no AWS credentials and no
 # backend init — so it can never touch infrastructure. Deploying is the operator's
 # job from their own checkout (see terraform/README.md), not this repo's CI.
+# Runs on every PR (no path filter) so `validate` can be a required status check
+# without deadlocking PRs that don't touch terraform/. It's credential-free.
 on:
   pull_request:
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/terraform.yml'
   workflow_dispatch: {}
 
 permissions:
