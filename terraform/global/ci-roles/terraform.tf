@@ -8,8 +8,9 @@ terraform {
     }
   }
 
+  # PARTIAL backend config — supply the account-specific bucket at init:
+  #   terraform init -backend-config="bucket=agentic-fs-terraform-state-<account_id>"
   backend "s3" {
-    bucket       = "agentic-fs-terraform-state-002988089284"
     key          = "global/ci-roles.tfstate"
     region       = "us-east-1"
     encrypt      = true

@@ -52,43 +52,27 @@ Run by a human with admin credentials, in order:
 # 1. State bucket (creates the backend everything else uses)
 cd terraform/global/bootstrap   # then follow its README (local apply → migrate to S3)
 
-# 2. CI roles (GitHub-OIDC plan/apply identities)
-cd ../ci-roles && terraform init && terraform apply
+# 2. CI roles (optional — GitHub-OIDC plan/apply identities, if you wire CI deploy)
+cd ../ci-roles
+terraform init -backend-config="bucket=agentic-fs-terraform-state-${ACCOUNT_ID}"
+terraform apply -var aws_account_id="${ACCOUNT_ID}" -var state_bucket_name="agentic-fs-terraform-state-${ACCOUNT_ID}"
 ```
 
-Then wire up GitHub (see [GitHub setup](#github-setup) below). After that, the
-pipeline owns `examples/quickstart`: PRs plan it, merges apply it.
+Then apply `examples/quickstart` from your checkout (see its README).
 
-## CI pipeline
+## CI is validate-only — deploy is yours
 
-`.github/workflows/terraform.yml`:
+`.github/workflows/terraform.yml` runs **only credential-free static checks** on
+PRs — `fmt` + `validate` (`-backend=false`) + `tflint` + `trivy`. **CI never
+touches an AWS account**: no plan-against-state, no apply, no stored account
+secret. You deploy from your own checkout (the commands above + each example's
+README), which keeps this public repo decoupled from any one account.
 
-- **PR** → `validate` (fmt/validate/tflint/trivy — credential-free, fork-safe) +
-  `plan` (read-only `agentic-fs-terraform-plan` role; sticky PR comment). Fork
-  PRs run only the credential-free `validate` job.
-- **Merge to `master`** → `apply` the quickstart via the env-gated
-  `agentic-fs-terraform-apply` role, inside the `sandbox` GitHub Environment.
-- **workflow_dispatch** → plan or apply the quickstart on demand.
-
-`.github/workflows/terraform-drift.yml`: weekly `plan -detailed-exitcode`; opens
-/updates an `infra-drift`-labelled issue when live AWS diverges from state.
-
-Plan/apply separation: the plan role is read-only by construction; the apply
-role holds writes and is assumable **only** from the gated `sandbox`
-environment. Write permissions are widened one milestone at a time in
-[`global/ci-roles`](global/ci-roles).
-
-## GitHub setup
-
-Required before the credentialed CI jobs can run:
-
-| What | Value | Set by |
-|---|---|---|
-| Repo secret `AWS_ACCOUNT_ID` | your AWS account ID | `gh secret set AWS_ACCOUNT_ID` |
-| Environment `sandbox` | (gates the apply job + scopes the apply role's OIDC trust) | repo Settings → Environments; add required reviewers to enforce manual approval |
-
-The OIDC roles themselves are created by `global/ci-roles`, which also ensures the
-account's GitHub OIDC provider exists.
+The `global/ci-roles` root still ships the GitHub-OIDC plan/apply identities for
+anyone who *wants* to wire their own deploy pipeline — but it's opt-in, not part
+of this repo's CI. Account-specific values (the account ID, the state bucket) are
+inputs, never defaults; the state bucket is supplied as partial backend config at
+`init` (`-backend-config="bucket=…"`).
 
 ## Tagging & teardown
 

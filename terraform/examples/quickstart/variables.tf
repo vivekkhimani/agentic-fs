@@ -10,7 +10,6 @@ variable "aws_region" {
 variable "aws_account_id" {
   description = "AWS account ID — used as the allowed-account guard and the global-uniqueness suffix on bucket/table names."
   type        = string
-  default     = "002988089284"
 }
 
 variable "name_prefix" {

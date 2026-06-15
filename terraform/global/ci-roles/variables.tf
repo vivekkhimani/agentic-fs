@@ -1,7 +1,6 @@
 variable "aws_account_id" {
   description = "AWS account ID that hosts agentic-fs infrastructure."
   type        = string
-  default     = "002988089284"
 }
 
 variable "aws_region" {
@@ -34,7 +33,6 @@ variable "apply_environment" {
 }
 
 variable "state_bucket_name" {
-  description = "Terraform remote-state bucket the CI roles need read/write + lock access to."
+  description = "Terraform remote-state bucket the CI roles need read/write + lock access to (convention: agentic-fs-terraform-state-<account_id>)."
   type        = string
-  default     = "agentic-fs-terraform-state-002988089284"
 }

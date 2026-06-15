@@ -20,14 +20,17 @@ cd terraform/global/bootstrap
 #    S3 bucket that all later roots depend on).
 #    e.g. aws sso login --profile agentic-fs-admin && export AWS_PROFILE=agentic-fs-admin
 
-# 2. Create the bucket with LOCAL state.
+# 2. Create the bucket with LOCAL state. Pass your account id + the bucket name
+#    (convention: agentic-fs-terraform-state-<account_id>).
+ACCOUNT_ID=<your-account-id>
+BUCKET="agentic-fs-terraform-state-${ACCOUNT_ID}"
 terraform init
-terraform plan      # review: one bucket + its config resources, nothing else
-terraform apply
+terraform plan  -var aws_account_id="${ACCOUNT_ID}" -var state_bucket_name="${BUCKET}"
+terraform apply -var aws_account_id="${ACCOUNT_ID}" -var state_bucket_name="${BUCKET}"
 
-# 3. Migrate bootstrap's own state INTO the bucket it just created:
-#    uncomment the `backend "s3"` block in terraform.tf, then:
-terraform init -migrate-state
+# 3. Migrate bootstrap's own state INTO the bucket it just created (the backend
+#    bucket is partial config, supplied here):
+terraform init -migrate-state -backend-config="bucket=${BUCKET}"
 ```
 
 After step 3, delete the local `terraform.tfstate*` files — the source of
