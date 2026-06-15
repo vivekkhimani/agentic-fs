@@ -20,8 +20,9 @@ terraform {
   #
   # See ./README.md for the exact command sequence.
   #
+  # PARTIAL backend config — supply the account-specific bucket at migrate-init:
+  #   terraform init -migrate-state -backend-config="bucket=agentic-fs-terraform-state-<account_id>"
   backend "s3" {
-    bucket       = "agentic-fs-terraform-state-002988089284"
     key          = "global/bootstrap.tfstate"
     region       = "us-east-1"
     encrypt      = true

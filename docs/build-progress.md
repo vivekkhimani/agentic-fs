@@ -349,12 +349,11 @@ Tracked here so they aren't lost — intentionally *not* built yet.
   - **We don't need the repo public for PyPI**, but we *do* for frictionless
     Terraform `git::` module sources (a private repo forces consumers' CI to carry
     a deploy key/PAT). Public = anonymous.
-  - **Pre-public cleanup (decision: do it as the "make it consumable" slice, not
-    now):** parameterize the hardcoded account ID `002988089284` (it's baked into
-    ci-roles/bootstrap defaults, the backend blocks, `quickstart`, the README, and
-    the `AWS_ACCOUNT_ID` secret) into variables/placeholders; decouple the
-    monorepo-specific CI. Account IDs aren't *secret*, but hardcoding the
-    maintainer's sandbox throughout an OSS template is poor hygiene.
+  - **Pre-public cleanup — done ✅:** the hardcoded account ID is parameterized
+    (required `aws_account_id` var, no defaults; backend bucket is partial config
+    via `-backend-config`); CI is **validate-only** (no apply/plan-against-account/
+    drift/image-push, no `AWS_ACCOUNT_ID` secret) so a public repo never touches an
+    account; all "Seamind"/internal references scrubbed.
   - **Recommendation:** keep developing privately; do the parameterization +
     visibility flip as a deliberate slice when wiring the consumer repo. Until
     then, **avoid adding new account-ID / monorepo coupling.** Promote this to a

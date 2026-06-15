@@ -1,7 +1,6 @@
 variable "aws_account_id" {
   description = "AWS account ID that hosts agentic-fs infrastructure."
   type        = string
-  default     = "002988089284"
 }
 
 variable "aws_region" {
@@ -14,8 +13,8 @@ variable "state_bucket_name" {
   description = <<-EOT
     Name of the S3 bucket that stores remote Terraform state for every
     agentic-fs root module. Account-suffixed for global uniqueness. This value
-    is referenced verbatim in each root's backend block — keep them in sync.
+    is supplied to each root's backend at init (-backend-config="bucket=…").
+    Convention: agentic-fs-terraform-state-<account_id>.
   EOT
   type        = string
-  default     = "agentic-fs-terraform-state-002988089284"
 }

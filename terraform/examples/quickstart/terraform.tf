@@ -8,10 +8,11 @@ terraform {
     }
   }
 
-  # Remote state in the bootstrap-created bucket, one key per root.
-  # Native S3 locking (use_lockfile) — no DynamoDB lock table.
+  # Remote state in the bootstrap-created bucket, one key per root. Native S3
+  # locking (use_lockfile) — no DynamoDB lock table. The bucket is account-
+  # specific, so it's PARTIAL backend config — supply it at init:
+  #   terraform init -backend-config="bucket=agentic-fs-terraform-state-<account_id>"
   backend "s3" {
-    bucket       = "agentic-fs-terraform-state-002988089284"
     key          = "examples/quickstart.tfstate"
     region       = "us-east-1"
     encrypt      = true

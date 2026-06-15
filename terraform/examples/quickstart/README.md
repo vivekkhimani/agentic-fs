@@ -1,16 +1,18 @@
 # Example: quickstart
 
-The default, near-$0-idle agentic-fs footprint and the root the CI pipeline
-auto-applies into the `sandbox` GitHub Environment on merge to `master`.
+The default, near-$0-idle agentic-fs footprint. You apply it from your own
+checkout (CI is validate-only and never deploys — see [`../../README.md`](../../README.md)).
 
-**Variable budget:** `aws_region` is the only required input; everything else is
-defaulted (plan §11.3).
+**Required inputs:** `aws_account_id` (the target account) and `aws_region`. The
+state bucket is account-specific, so it's supplied as partial backend config at
+init. Everything else is defaulted.
 
 ```bash
 cd terraform/examples/quickstart
-terraform init
-terraform plan -var aws_region=us-east-1
-terraform apply -var aws_region=us-east-1
+ACCOUNT_ID=<your-account-id>
+terraform init -backend-config="bucket=agentic-fs-terraform-state-${ACCOUNT_ID}"
+terraform plan  -var aws_account_id="${ACCOUNT_ID}" -var aws_region=us-east-1
+terraform apply -var aws_account_id="${ACCOUNT_ID}" -var aws_region=us-east-1
 ```
 
 ## Composed so far
@@ -35,7 +37,7 @@ function is created. Two steps:
 
 ```bash
 # 1. Create the ECR repo (and the rest of the footprint). Compute is OFF here.
-terraform apply -var aws_region=us-east-1            # enable_compute defaults to false
+terraform apply -var aws_account_id="${ACCOUNT_ID}" -var aws_region=us-east-1   # enable_compute defaults to false
 
 # 2. Build + push the image to the repo from step 1.
 REPO=$(terraform output -raw ecr_repository_url)
@@ -45,7 +47,7 @@ docker build --platform linux/amd64 -t "$REPO:0.1.0" ../../..      # repo root D
 docker push "$REPO:0.1.0"
 
 # 3. Now create the Lambda + Function URL (image_tag defaults to 0.1.0).
-terraform apply -var aws_region=us-east-1 -var enable_compute=true
+terraform apply -var aws_account_id="${ACCOUNT_ID}" -var aws_region=us-east-1 -var enable_compute=true
 terraform output function_url
 ```
 
