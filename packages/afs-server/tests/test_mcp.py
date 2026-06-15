@@ -47,8 +47,34 @@ async def test_tools_are_listed(client: Client) -> None:
     names = {t.name for t in await client.list_tools()}
     assert {
         "whoami", "fs_list", "fs_stat", "fs_read", "fs_glob", "fs_grep",
+        "fs_tree", "fs_find", "fs_outline",
         "scratch_write", "scratch_read", "scratch_list", "scratch_delete",
     } <= names  # fmt: skip
+
+
+async def test_fs_tree(client: Client) -> None:
+    res = await client.call_tool("fs_tree", {"namespace": "handbook"})
+    assert "intro.md" in res.data["tree"]
+    assert res.data["files"] == 2
+
+
+async def test_fs_find_by_status(client: Client) -> None:
+    res = await client.call_tool("fs_find", {"namespace": "handbook", "status": "catalog_only"})
+    assert [i["path"] for i in res.data["items"]] == ["scan.pdf"]
+
+
+async def test_fs_find_coerces_iso_string(client: Client) -> None:
+    # modified_after is a datetime param — the schema coerces the ISO string (incl. Z).
+    res = await client.call_tool(
+        "fs_find", {"namespace": "handbook", "modified_after": "2000-01-01T00:00:00Z"}
+    )
+    assert {i["path"] for i in res.data["items"]} == {"intro.md", "scan.pdf"}
+
+
+async def test_fs_outline_empty(client: Client) -> None:
+    res = await client.call_tool("fs_outline", {"namespace": "handbook", "path": "intro.md"})
+    assert res.data["page_count"] == 1
+    assert res.data["headings"] == []  # "hello world" has no markdown headings
 
 
 async def test_scratch_roundtrip(client: Client) -> None:

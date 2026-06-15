@@ -10,6 +10,7 @@ states the find→read flow and the bounds), per the plan.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from fastmcp.exceptions import ToolError
@@ -135,10 +136,14 @@ class FsGrepTool:
             context_lines: int = 0,
             max_files: int = 200,
             max_matches: int = 100,
+            content_type: str | None = None,
+            files_with_matches: bool = False,
         ) -> dict[str, Any]:
             """Regex-search documents' extracted text in a namespace (two-stage, bounded).
 
-            `pattern` is a regex; `path_glob` narrows which docs are scanned first.
+            `pattern` is a regex; `path_glob` narrows which docs are scanned first, and
+            `content_type` filters by MIME (exact or prefix like `application/pdf`).
+            Set `files_with_matches: true` for just the matching paths (cheap discovery).
             Results are capped (files / matches / bytes); `truncated: true` means a
             budget was hit — narrow with `path_glob` or a tighter `pattern`. Each hit
             gives `path` + `page` — pass those to fs_read for the full surrounding text.
@@ -153,7 +158,88 @@ class FsGrepTool:
                     context_lines=context_lines,
                     max_files=max_files,
                     max_matches=max_matches,
+                    content_type=content_type,
+                    files_with_matches=files_with_matches,
                 )
+            )
+
+
+class FsTreeTool:
+    name = "fs_tree"
+    required_scopes = frozenset({"fs:read"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def fs_tree(
+            namespace: str, prefix: str = "", max_entries: int = 2000
+        ) -> dict[str, Any]:
+            """Show a namespace as an indented directory tree (like `tree`/`ls -R`).
+
+            The fastest way to grasp a namespace's structure before globbing/reading.
+            `prefix` scopes to a subtree; `truncated: true` means the entry cap hit —
+            pass a deeper `prefix` to narrow.
+            """
+            return await _result(
+                deps.fs.tree(deps.resolve(), namespace, prefix=prefix, max_entries=max_entries)
+            )
+
+
+class FsFindTool:
+    name = "fs_find"
+    required_scopes = frozenset({"fs:read"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def fs_find(
+            namespace: str,
+            pattern: str = "*",
+            content_type: str | None = None,
+            status: str | None = None,
+            min_size: int | None = None,
+            max_size: int | None = None,
+            modified_after: datetime | None = None,
+            limit: int = 100,
+        ) -> dict[str, Any]:
+            """Find documents by path glob + metadata filters (the `find` to fs_grep).
+
+            Filter by `content_type` (exact or prefix), extraction `status`
+            (extracted / catalog_only / pending), size bounds, and `modified_after`
+            (ISO-8601 date/time, coerced by the schema). Returns each match's path +
+            size + type + status + mtime. `truncated: true` means more matched than `limit`.
+            """
+            return await _result(
+                deps.fs.find(
+                    deps.resolve(),
+                    namespace,
+                    pattern=pattern,
+                    content_type=content_type,
+                    status=status,
+                    min_size=min_size,
+                    max_size=max_size,
+                    modified_after=modified_after,
+                    limit=limit,
+                )
+            )
+
+
+class FsOutlineTool:
+    name = "fs_outline"
+    required_scopes = frozenset({"fs:read"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def fs_outline(namespace: str, path: str, max_headings: int = 300) -> dict[str, Any]:
+            """Return a document's structure: its markdown headings + the page each is on.
+
+            A symbol map for a document — read this first to jump straight to the
+            relevant section with fs_read instead of paging through everything. Plain
+            documents with no headings return an empty outline.
+            """
+            return await _result(
+                deps.fs.outline(deps.resolve(), namespace, path, max_headings=max_headings)
             )
 
 
