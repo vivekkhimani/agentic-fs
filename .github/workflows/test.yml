@@ -1,18 +1,11 @@
 name: Python
 
+# Runs on every PR (no path filter) so it can be a required status check without
+# deadlocking PRs that don't touch packages/. It's fast (~1 min).
 on:
   pull_request:
-    paths:
-      - 'packages/**'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/test.yml'
   push:
     branches: [master]
-    paths:
-      - 'packages/**'
-      - 'pyproject.toml'
-      - 'uv.lock'
 
 permissions:
   contents: read
