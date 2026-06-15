@@ -6,6 +6,7 @@ return 404 (no enumeration) — the load-bearing rules from the plan (§2.1, §6
 
 from __future__ import annotations
 
+import difflib
 import re
 from fnmatch import fnmatchcase
 from typing import TYPE_CHECKING
@@ -18,6 +19,7 @@ from afs_core.errors import (
     ValidationError,
 )
 from afs_server.schemas import (
+    DiffResponse,
     EntryPage,
     FindItem,
     FindResponse,
@@ -28,6 +30,8 @@ from afs_server.schemas import (
     OutlineResponse,
     ReadPage,
     ReadResponse,
+    Table,
+    TablesResponse,
     TreeResponse,
 )
 
@@ -56,6 +60,12 @@ MAX_OUTLINE_PAGES = 50  # pages scanned for headings
 MAX_OUTLINE_HEADINGS = 300
 OUTLINE_TITLE_CAP = 200
 
+MAX_TABLE_PAGES = 50  # pages scanned for tables
+MAX_TABLES = 50
+MAX_TABLE_ROWS = 200  # data rows kept per table
+DIFF_DOC_PAGE_CAP = MAX_READ_PAGES  # pages of each doc compared
+DIFF_MAX_LINES = 500  # unified-diff lines returned
+
 # Markdown ATX headings (`#`..`######`) — extraction (esp. docling) emits markdown,
 # so this is a precise structure signal; plain-text docs simply yield no headings.
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(\S.*?)\s*#*\s*$")
@@ -76,6 +86,39 @@ def _glob_prefix(pattern: str) -> str:
 def _matches_type(actual: str, wanted: str) -> bool:
     """Content-type filter: exact, or a prefix like ``image/`` / ``application``."""
     return actual == wanted or actual.startswith(wanted)
+
+
+def _table_cells(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def _is_table_separator(line: str) -> bool:
+    cells = _table_cells(line)
+    return bool(cells) and all(re.fullmatch(r":?-{1,}:?", c) for c in cells if c != "")
+
+
+def _parse_md_tables(text: str) -> list[tuple[list[str], list[list[str]]]]:
+    """Extract GitHub-flavoured markdown tables (header, sep, rows) from text.
+    Extraction (docling/pdftables) emits tables as markdown, so this surfaces them
+    without re-running a parser on the original bytes."""
+    lines = text.splitlines()
+    tables: list[tuple[list[str], list[list[str]]]] = []
+    i = 0
+    while i < len(lines):
+        row = lines[i]
+        is_row = "|" in row and row.strip().startswith("|")
+        if is_row and i + 1 < len(lines) and _is_table_separator(lines[i + 1]):
+            header = _table_cells(row)
+            rows: list[list[str]] = []
+            j = i + 2
+            while j < len(lines) and "|" in lines[j] and lines[j].strip().startswith("|"):
+                rows.append(_table_cells(lines[j]))
+                j += 1
+            tables.append((header, rows))
+            i = j
+        else:
+            i += 1
+    return tables
 
 
 def _render_tree(paths: list[str], prefix: str) -> tuple[str, int, int]:
@@ -405,6 +448,82 @@ class FsService:
         return OutlineResponse(
             path=path, page_count=page_count, headings=headings, truncated=truncated
         )
+
+    async def read_section(
+        self, ctx: TenantContext, namespace: str, path: str, section: str
+    ) -> ReadResponse:
+        """Read the page span of one heading from the outline (page-level granularity)."""
+        outline = await self.outline(ctx, namespace, path)
+        needle = section.strip().lower()
+        target = next((h for h in outline.headings if needle in h.title.lower()), None)
+        if target is None:
+            raise ValidationError(
+                f"no section matching {section!r} — use fs_outline to list headings",
+                detail={"path": path, "section": section},
+            )
+        # The section ends where the next heading at the same-or-higher level begins;
+        # include that page (page granularity can't split mid-page).
+        end = outline.page_count
+        for h in outline.headings:
+            if h.page > target.page and h.level <= target.level:
+                end = h.page
+                break
+        return await self.read(ctx, namespace, path, start_page=target.page, end_page=end)
+
+    async def tables(self, ctx: TenantContext, namespace: str, path: str) -> TablesResponse:
+        """Markdown tables parsed out of a document's extracted text."""
+        entry = await self.stat(ctx, namespace, path)
+        if entry.extraction.status != "extracted":
+            raise CatalogOnlyError(
+                "this document exists but isn't readable yet — you can still cite it",
+                detail={"path": path, "status": entry.extraction.status},
+            )
+        page_count = entry.extraction.page_count or 0
+        scan_pages = min(page_count, MAX_TABLE_PAGES)
+        out: list[Table] = []
+        truncated = page_count > scan_pages
+        for page_no in range(1, scan_pages + 1):
+            if len(out) >= MAX_TABLES:
+                truncated = True
+                break
+            key = keys.derived_text_key(ctx.tenant_id, namespace, entry.entry_id, page_no)
+            raw = await self._objects.get(key)
+            for header, rows in _parse_md_tables(raw.decode("utf-8", "replace")):
+                if len(rows) > MAX_TABLE_ROWS:
+                    truncated = True
+                out.append(Table(page=page_no, header=header, rows=rows[:MAX_TABLE_ROWS]))
+                if len(out) >= MAX_TABLES:
+                    truncated = True
+                    break
+        return TablesResponse(path=path, tables=out, truncated=truncated)
+
+    async def diff(
+        self, ctx: TenantContext, namespace: str, path_a: str, path_b: str
+    ) -> DiffResponse:
+        """A bounded unified diff between two documents' extracted text."""
+        text_a = await self._doc_text(ctx, namespace, path_a)
+        text_b = await self._doc_text(ctx, namespace, path_b)
+        lines = list(
+            difflib.unified_diff(
+                text_a.splitlines(),
+                text_b.splitlines(),
+                fromfile=path_a,
+                tofile=path_b,
+                lineterm="",
+            )
+        )
+        truncated = len(lines) > DIFF_MAX_LINES
+        return DiffResponse(
+            path_a=path_a,
+            path_b=path_b,
+            diff="\n".join(lines[:DIFF_MAX_LINES]),
+            truncated=truncated,
+        )
+
+    async def _doc_text(self, ctx: TenantContext, namespace: str, path: str) -> str:
+        """First pages of a document's derived text, joined (for diff)."""
+        resp = await self.read(ctx, namespace, path, start_page=1, end_page=DIFF_DOC_PAGE_CAP)
+        return "\n".join(p.text for p in resp.pages)
 
     async def _match_entries(
         self,

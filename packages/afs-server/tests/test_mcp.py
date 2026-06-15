@@ -47,7 +47,7 @@ async def test_tools_are_listed(client: Client) -> None:
     names = {t.name for t in await client.list_tools()}
     assert {
         "whoami", "fs_list", "fs_stat", "fs_read", "fs_glob", "fs_grep",
-        "fs_tree", "fs_find", "fs_outline",
+        "fs_tree", "fs_find", "fs_outline", "fs_tables", "fs_diff",
         "scratch_write", "scratch_read", "scratch_list", "scratch_delete",
     } <= names  # fmt: skip
 
@@ -69,6 +69,25 @@ async def test_fs_find_coerces_iso_string(client: Client) -> None:
         "fs_find", {"namespace": "handbook", "modified_after": "2000-01-01T00:00:00Z"}
     )
     assert {i["path"] for i in res.data["items"]} == {"intro.md", "scan.pdf"}
+
+
+async def test_fs_tables_empty(client: Client) -> None:
+    res = await client.call_tool("fs_tables", {"namespace": "handbook", "path": "intro.md"})
+    assert res.data["tables"] == []  # "hello world" has no markdown tables
+
+
+async def test_fs_diff_identical(client: Client) -> None:
+    res = await client.call_tool(
+        "fs_diff", {"namespace": "handbook", "path_a": "intro.md", "path_b": "intro.md"}
+    )
+    assert res.data["diff"] == ""
+
+
+async def test_fs_read_section_missing_is_tool_error(client: Client) -> None:
+    with pytest.raises(ToolError, match="section"):
+        await client.call_tool(
+            "fs_read", {"namespace": "handbook", "path": "intro.md", "section": "Nope"}
+        )
 
 
 async def test_fs_outline_empty(client: Client) -> None:

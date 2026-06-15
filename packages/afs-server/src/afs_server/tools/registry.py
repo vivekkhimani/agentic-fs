@@ -12,6 +12,7 @@ from importlib.metadata import entry_points
 
 from afs_server.tools.base import Tool
 from afs_server.tools.builtin import (
+    FsDiffTool,
     FsFindTool,
     FsGlobTool,
     FsGrepTool,
@@ -19,6 +20,7 @@ from afs_server.tools.builtin import (
     FsOutlineTool,
     FsReadTool,
     FsStatTool,
+    FsTablesTool,
     FsTreeTool,
     ScratchDeleteTool,
     ScratchListTool,
@@ -42,6 +44,8 @@ _BUILTIN_TOOLS: dict[str, type[Tool]] = {
         FsTreeTool,
         FsFindTool,
         FsOutlineTool,
+        FsTablesTool,
+        FsDiffTool,
         ScratchWriteTool,
         ScratchReadTool,
         ScratchListTool,

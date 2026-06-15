@@ -42,7 +42,7 @@ document to the Function URL → it lands in S3 (SSE-KMS), is extracted
 | Package | What's in it |
 |---|---|
 | `afs-core` | the **contracts** (`ObjectStore` · `CatalogStore` · `Normalizer` · `Connector` Protocols), DTOs, the key scheme, the closed error vocabulary, and the **conformance kits** for each |
-| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + extraction pipeline** (10 rungs: lightweight `text_native`/`pdf`/`pdftables`/`docx` in-request, plus opt-in extras `textract`/`textract_analyze`/`tesseract`/`rapidocr`/`docling`/`llm` that escalate; **Haystack engine** by default with a slim ladder "lite" mode, **presets**, **content-type routing**, and a char+confidence quality gate — [ADR 0006](decisions/0006-extraction-normalizer-contract.md), [ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read` · `fs_glob` · `fs_grep` · `fs_tree` · `fs_find` · `fs_outline` · `scratch_*`, through a pluggable registry + uniform middleware — visibility/enforcement/audit/budget, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md), in-process) |
+| `afs-server` | `settings`, the **pluggable store registry**, `S3ObjectStore` + `DynamoDBCatalogStore` (moto-certified), the **`FsService` read path**, the **`IngestService` + extraction pipeline** (10 rungs: lightweight `text_native`/`pdf`/`pdftables`/`docx` in-request, plus opt-in extras `textract`/`textract_analyze`/`tesseract`/`rapidocr`/`docling`/`llm` that escalate; **Haystack engine** by default with a slim ladder "lite" mode, **presets**, **content-type routing**, and a char+confidence quality gate — [ADR 0006](decisions/0006-extraction-normalizer-contract.md), [ADR 0010](decisions/0010-extraction-routing-and-pipeline-engine.md)), a **FastAPI app** (`/v1/healthz` · `/readyz` · `/me` · `fs/{ns}/{entries,stat,doc}` · `ingest/{ns}/doc` PUT+DELETE), and an **MCP mount** at `/mcp` (`whoami` · `fs_list` · `fs_stat` · `fs_read` · `fs_glob` · `fs_grep` · `fs_tree` · `fs_find` · `fs_outline` · `fs_tables` · `fs_diff` · `scratch_*`, through a pluggable registry + uniform middleware — visibility/enforcement/audit/budget, [ADR 0012](decisions/0012-mcp-tools-and-middleware.md), in-process) |
 | `afs-connector-sdk` | the **`fs-crawler` CLI** + `SyncEngine` (discover → **version-skip / checksum-skip** → ingest → prune, with **incremental delta + server-side checkpoints**, [ADR 0008](decisions/0008-incremental-sync.md)) + `IngestClient` (SigV4 / no-auth) + **Local FS**, **S3**, and **Google Drive** (OAuth + native-doc export) connectors ([ADR 0007](decisions/0007-connector-model.md)) — verified end-to-end against the live Function URL |
 
 The API is **containerized** ([`Dockerfile`](../Dockerfile), [ADR 0003](decisions/0003-container-image.md)):
@@ -185,9 +185,10 @@ it — so the system is demoable at every step (plan §15).
     (a document's markdown-heading + page map — a "symbol map for docs"), and
     **`fs_grep`** gained ripgrep-style **content-type filter** + **files-with-matches**.
     (Remaining grep flags — count-only/invert/multiline — are easy follow-ons.)
-  - **Tier 2 — read deeper (mostly free)** 🔜: `fs_read` by section (from the outline);
-    **`fs_tables`** (structured tables via the pdftables/textract_analyze rungs);
-    **`fs_diff`** (two docs / two versions).
+  - **Tier 2 — read deeper (mostly free)** ✅: **`fs_read` by section** (a `section`
+    param resolves the outline → that heading's page span); **`fs_tables`** (parses
+    markdown tables from extracted text → structured header+rows+page); **`fs_diff`**
+    (bounded unified diff of two documents' extracted text).
   - **Tier 3 — search, no vector-store bill (experiment later, keep on the list):**
     **`fs_search` = expand → grep → rerank** (LLM query expansion → two-stage grep →
     rerank top-N), optionally on-demand embeddings over the candidate set — semantic

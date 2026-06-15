@@ -102,6 +102,29 @@ class OutlineResponse(BaseModel):
     truncated: bool  # heading cap or page cap hit
 
 
+class Table(BaseModel):
+    page: int  # 1-based derived page the table was found on
+    header: list[str]
+    rows: list[list[str]]
+
+
+class TablesResponse(BaseModel):
+    """Markdown tables parsed out of a document's extracted text."""
+
+    path: str
+    tables: list[Table]
+    truncated: bool  # table/row cap or page cap hit
+
+
+class DiffResponse(BaseModel):
+    """A bounded unified diff between two documents' extracted text."""
+
+    path_a: str
+    path_b: str
+    diff: str  # unified-diff text ("" when identical)
+    truncated: bool  # the line budget was hit
+
+
 class ScratchWriteResult(BaseModel):
     """Result of a scratch write/delete, with the principal's quota usage after."""
 
