@@ -26,6 +26,7 @@ members = [
 [manifest.dependency-groups]
 dev = [
     { name = "cryptography", specifier = ">=43,<45" },
+    { name = "fsspec", specifier = ">=2024.6" },
     { name = "haystack-ai", specifier = ">=2.10" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "moto", extras = ["s3"], specifier = ">=5" },
@@ -142,6 +143,9 @@ docling = [
     { name = "torchvision", version = "0.27.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torchvision", version = "0.27.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
 ]
+fsspec = [
+    { name = "fsspec" },
+]
 haystack = [
     { name = "haystack-ai" },
 ]
@@ -173,6 +177,7 @@ requires-dist = [
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "fastmcp", specifier = ">=2" },
+    { name = "fsspec", marker = "extra == 'fsspec'", specifier = ">=2024.6" },
     { name = "haystack-ai", marker = "extra == 'haystack'", specifier = ">=2.10" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.50" },
     { name = "pdfplumber", marker = "extra == 'pdftables'", specifier = ">=0.11" },
@@ -192,7 +197,7 @@ requires-dist = [
     { name = "torchvision", marker = "extra == 'docling'", index = "https://download.pytorch.org/whl/cpu" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
-provides-extras = ["docling", "textract", "tesseract", "rapidocr", "pdftables", "anthropic", "openai", "haystack", "postgres", "search"]
+provides-extras = ["fsspec", "docling", "textract", "tesseract", "rapidocr", "pdftables", "anthropic", "openai", "haystack", "postgres", "search"]
 
 [[package]]
 name = "aiofile"

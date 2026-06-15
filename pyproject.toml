@@ -35,6 +35,8 @@ dev = [
     "pdfplumber>=0.11",
     # Lets the suite exercise the Haystack engine (it's the `[haystack]` extra).
     "haystack-ai>=2.10",
+    # Lets the suite certify the fsspec object store (it's the `[fsspec]` extra).
+    "fsspec>=2024.6",
     # Pinned below 49 so a prebuilt macOS wheel is used in local dev (49.0.0's
     # wheel tags require a newer base than our toolchain resolves to). CI on
     # Linux is unaffected. moto only needs cryptography for request signing.

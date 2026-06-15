@@ -1,7 +1,7 @@
 # agentic-fs — build progress & roadmap
 
 > A living map from **what we've built** to **the vision** (`agentic-fs-oss-plan.md`).
-> Updated as each slice lands. Last updated: 2026-06-14.
+> Updated as each slice lands. Last updated: 2026-06-15.
 
 ## The vision in one line
 
@@ -53,7 +53,8 @@ DynamoDB Local.
 
 **Both stores done.** Swap-ability is real and demonstrated:
 - object store — the S3 store *is* the store for any S3-compatible endpoint
-  (MinIO, Cloudflare R2, Wasabi, B2) via one env var
+  (MinIO, Cloudflare R2, Wasabi, B2) via one env var; and the **`fsspec`** backend
+  covers non-S3 storage (GCS/Azure/HDFS/local) with one more
   ([swap guide](swap-guides/object-store.md)).
 - catalog store — `DynamoDBCatalogStore` over the single-table schema; another
   backend (e.g. Postgres) is implement → certify → register
@@ -202,12 +203,13 @@ it — so the system is demoable at every step (plan §15).
   the `hardened`/`full`/`byo-postgres` example roots.
 - **Ecosystem adapters (don't reinvent the edges)** — [ADR 0014](decisions/0014-connector-extraction-ecosystem-adapters.md):
   keep our thin `Connector`/`Normalizer` contracts as the stable seam and tie big
-  OSS ecosystems in behind them. **`LlamaHub reader → Connector`** (300+ sources,
-  highest leverage) and **`fsspec → ObjectStore`** (GCS/Azure/HDFS/local with one
-  adapter) — each implement → conformance-certify → register under its
-  entry-point group (ADR 0002), shipped as optional extras so the core stays lean.
-  Airbyte/Singer deliberately *not* a core dep (record-shaped ELT; interop via
-  land-in-S3 + the S3 connector instead).
+  OSS ecosystems in behind them. **`LlamaHub reader → Connector`** ✅ (300+ sources)
+  and **`fsspec → ObjectStore`** ✅ (`FsspecObjectStore` over GCS/Azure/HDFS/local/
+  memory, certified by the S3 conformance kit; `AFS_OBJECT_STORE_BACKEND=fsspec` +
+  `AFS_FSSPEC_ROOT`, `[fsspec]` extra) — each implemented → conformance-certified →
+  registered under its entry-point group (ADR 0002), shipped as optional extras so
+  the core stays lean. Airbyte/Singer deliberately *not* a core dep (record-shaped
+  ELT; interop via land-in-S3 + the S3 connector instead).
 
 ## How the pipeline keeps us safe as we add each piece
 

@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from afs_core.contracts import CatalogStore, ObjectStore
 from afs_server.stores.catalog_dynamodb import DynamoDBCatalogStore
+from afs_server.stores.objects_fsspec import FsspecObjectStore
 from afs_server.stores.objects_s3 import S3ObjectStore
 
 if TYPE_CHECKING:
@@ -33,6 +34,7 @@ _CATALOG_STORE_ENTRY_GROUP = "afs.catalog_stores"
 # Builtin factories: name -> (settings) -> store.
 _OBJECT_STORE_BUILTINS: dict[str, Callable[[Settings], ObjectStore]] = {
     "s3": S3ObjectStore.from_settings,
+    "fsspec": FsspecObjectStore.from_settings,
 }
 _CATALOG_STORE_BUILTINS: dict[str, Callable[[Settings], CatalogStore]] = {
     "dynamodb": DynamoDBCatalogStore.from_settings,

@@ -17,10 +17,14 @@ class Settings(BaseSettings):
     region: str = "us-east-1"
 
     # --- object store ---
-    object_store_backend: str = "s3"  # builtin "s3", or an afs.object_stores plugin name
+    object_store_backend: str = "s3"  # builtin "s3"/"fsspec", or an afs.object_stores plugin
     data_bucket: str = "agentic-fs-data"
     s3_endpoint_url: str | None = None  # set for MinIO / R2 / Wasabi / B2
     kms_key_arn: str | None = None  # SSE-KMS on PUT when set
+    # fsspec backend (object_store_backend="fsspec"): an fsspec URL — gcs://bucket/
+    # prefix, az://container/prefix, file:///var/lib/agentic-fs, … (needs the
+    # [fsspec] extra + the matching backend, e.g. gcsfs/adlfs). ADR 0014.
+    fsspec_root: str = ""
 
     # --- catalog store ---
     catalog_backend: str = "dynamodb"  # builtin "dynamodb"/"postgres", or a plugin name
