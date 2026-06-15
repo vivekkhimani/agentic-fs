@@ -1,0 +1,6 @@
+# Local Terraform state (never commit — contains resource metadata)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+tfplan

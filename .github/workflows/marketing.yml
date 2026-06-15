@@ -1,0 +1,54 @@
+name: Marketing site
+
+# Validate on PR (credential-free); deploy ONLY on a deliberate, owner-gated
+# manual run — a fork or a routine merge never deploys.
+on:
+  pull_request:
+    paths:
+      - 'marketing/**'
+      - '.github/workflows/marketing.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: '1.10.5'
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - name: Terraform fmt + validate (no backend)
+        working-directory: marketing/infra
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate -no-color
+      - name: Site sanity check
+        run: test -f marketing/site/index.html && test -f marketing/site/styles.css
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && github.repository_owner == 'vivekkhimani'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.SITE_AWS_ACCOUNT_ID }}:role/agenticfs-site-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync site to S3
+        run: aws s3 sync marketing/site/ "s3://${{ vars.SITE_BUCKET }}/" --delete --cache-control "public,max-age=300"
+
+      - name: Invalidate CloudFront
+        run: aws cloudfront create-invalidation --distribution-id "${{ vars.SITE_DISTRIBUTION_ID }}" --paths '/*'
