@@ -10,7 +10,7 @@
 # ---------------------------------------------------------------------------
 # Builder — resolve + install into a self-contained venv with uv (cached).
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.13-slim-bookworm AS builder
 
 # Pinned uv, copied from its official image (no curl|sh).
 COPY --from=ghcr.io/astral-sh/uv:0.9.13 /uv /uvx /usr/local/bin/
@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------------------------------------------------------------------------
 # Runtime — minimal, non-root, web-adapter-enabled.
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.13-slim-bookworm AS runtime
 
 # AWS Lambda Web Adapter: forwards Lambda Function URL invocations (incl.
 # response streaming) to the local ASGI server. Inert when not on Lambda.
