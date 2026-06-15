@@ -7,10 +7,9 @@ credentials**, before any root can `terraform init` against the S3 backend.
 State locking is handled by S3 natively (`use_lockfile = true`, Terraform
 >= 1.10) — there is no DynamoDB lock table to create.
 
-During the trial phase this runs in the existing Seamind account
-(`002988089284`); everything it creates is `agentic-fs-*`-named and
-`Project = agentic-fs`-tagged, so it stays cleanly separable from Seamind's own
-infrastructure.
+It runs in your AWS account; everything it creates is `agentic-fs-*`-named and
+`Project = agentic-fs`-tagged, so it stays cleanly separable from any other
+infrastructure sharing the account.
 
 ## First-time setup
 

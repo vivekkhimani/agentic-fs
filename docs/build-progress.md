@@ -14,7 +14,7 @@ We are building it **infrastructure-first**: the deployment guardrails and the
 canonical storage substrate before the application code, so every later slice
 lands into a pipeline and a data model already proven safe.
 
-## Where we are right now (live in AWS `002988089284`)
+## Where we are right now (live in AWS)
 
 | Resource | Role in the vision |
 |---|---|
@@ -166,8 +166,8 @@ it — so the system is demoable at every step (plan §15).
   resolved principal, or a precise failure hint), auto-served PRM (RFC 9728,
   zero client auth code), `static-jwt` offline mode, and a **bring-your-own-IdP
   swap-guide** with per-IdP recipes ([auth swap-guide](swap-guides/auth.md):
-  WorkOS/Cognito/Auth0/Okta/Keycloak). *Remaining:* the live **seamind-learn
-  WorkOS** spike (use `afs auth doctor` on a real token) — the exit criterion;
+  WorkOS/Cognito/Auth0/Okta/Keycloak). *Remaining:* a live **WorkOS** spike
+  against a real deployment (use `afs auth doctor` on a real token) — the exit criterion;
   tenant isolation + scope denial verified live.
 - **M4 — Observability** ✅ ([`observability` module](../terraform/modules/observability/README.md))
   — an SNS alerts topic + **7 component-gated, high-signal** CloudWatch alarms

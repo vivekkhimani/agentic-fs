@@ -77,8 +77,8 @@ privileged, rare, deliberate act — it stays out of the automated path.
 `Component`/`Example`, and `Env` on every resource. `Project = agentic-fs` is the
 canonical teardown selector.
 
-**Why.** The footprint shares the existing Seamind account during the trial, so
-clean separation and confident teardown were requirements from the start. A
+**Why.** The footprint may share an AWS account with other workloads, so clean
+separation and confident teardown were requirements from the start. A
 uniform tag makes "list everything this project created" a single
 `get-resources --tag-filters Key=Project,Values=agentic-fs` query — the
 definitive check that a `terraform destroy` sweep left nothing behind.

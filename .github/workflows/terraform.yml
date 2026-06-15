@@ -1,14 +1,14 @@
 name: Terraform
 
+# Deploy is decoupled from merge (OSS-safe): a merge to master NEVER mutates an
+# AWS account. PRs get a read-only plan; applying the quickstart is a deliberate
+# manual `workflow_dispatch` (gated by the `sandbox` Environment + the apply
+# role's OIDC trust). Adopters run terraform from their own checkout.
 on:
   pull_request:
     paths:
       - 'terraform/**'
       - '.github/workflows/terraform.yml'
-  push:
-    branches: [master]
-    paths:
-      - 'terraform/**'
   workflow_dispatch:
     inputs:
       action:
@@ -205,41 +205,12 @@ jobs:
         run: exit 1
 
   # ---------------------------------------------------------------------------
-  # Merge to master: auto-apply the sandbox quickstart. Plans and applies
-  # atomically in one job so the applied plan is exactly what was just computed.
-  # The `sandbox` GitHub Environment carries the approval gate AND is what the
-  # apply role's OIDC trust is restricted to.
-  # ---------------------------------------------------------------------------
-  apply:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment: sandbox
-    defaults:
-      run:
-        working-directory: ${{ env.TF_ROOT }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/agentic-fs-terraform-apply
-          aws-region: ${{ env.AWS_REGION }}
-
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
-        with:
-          terraform_version: ${{ env.TF_VERSION }}
-
-      - run: terraform init -input=false
-      - run: terraform plan -input=false -var aws_region=${{ env.AWS_REGION }} -out=tfplan
-      - run: terraform apply -input=false -auto-approve tfplan
-
-  # ---------------------------------------------------------------------------
-  # Manual dispatch: plan or apply the sandbox quickstart on demand. Apply path
-  # runs in the gated `sandbox` Environment.
+  # Manual dispatch: plan or apply the sandbox quickstart on demand (the only way
+  # CI touches an account). Runs in the gated `sandbox` Environment, restricted to
+  # the canonical repo so a fork can never deploy.
   # ---------------------------------------------------------------------------
   dispatch:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.repository_owner == 'vivekkhimani'
     runs-on: ubuntu-latest
     environment: sandbox
     defaults:

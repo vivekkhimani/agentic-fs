@@ -1,11 +1,9 @@
 # Agentic File System — open-source, AWS-native (design plan)
 
-> Status: PROPOSED (June 2026). To be implemented in a **separate, standalone
-> repository** — this doc is the build spec, not a Seamind feature. It is a
-> clean-room redesign of the concepts on `claude/mcp-namespaces-n0-n1`
-> (`docs/mcp-namespaces-design.md`, `docs/mcp-oauth-design.md`): port the
-> *ideas*, not the Seamind-coupled code (Piccolo, WorkOS, Valkey, Dramatiq,
-> Next.js BFF all stay behind).
+> Status: PROPOSED (June 2026). Implemented in this **standalone repository** —
+> this doc is the build spec. It is a clean-room design: port the *ideas* from
+> prior internal prototypes, not any application-coupled code (an ORM, a specific
+> IdP, a cache, a task queue, a web BFF all stay behind).
 >
 > Working name: **`agentic-fs`** (Python import prefix `afs_`, CLI `afs`).
 > "AgentFS" is taken (Turso, 2025) — final name TBD (§16). License: Apache-2.0.
@@ -127,7 +125,7 @@ References: [Anthropic — effective context engineering](https://www.anthropic.
 - **Declared policy, projected into tests.** Every route declares its required
   scopes or fails at import; the OpenAPI schema carries `x-required-scopes` /
   `x-mcp-tool`; a contract test asserts coverage. (The lightweight OSS port of
-  Seamind's declared-authz discipline.)
+  the prior prototype's declared-authz discipline.)
 
 ### 2.2 Component diagram
 
@@ -825,7 +823,7 @@ unknown/ungranted namespace ⇒ NamespaceNotFoundError ⇒ 404 (no enumeration)
 7. **Structured audit log** — one JSON event per call (§4.6).
 
 **Tool surface** (builtin, **generic with a validated `namespace` argument** —
-a deliberate divergence from Seamind's per-namespace loop, because namespaces
+a deliberate divergence from the prior prototype's per-namespace loop, because namespaces
 are runtime data and per-tenant tool explosion would bloat `tools/list` and
 break client caching):
 
@@ -1081,7 +1079,7 @@ documented as the hardened variant (+~$65/mo).
   providers, asserting policy JSON, flag-conditional resource counts, naming) +
   one nightly real `apply`+`destroy` of `examples/quickstart` in the maintainer
   sandbox.
-- **CI** (mirrors Seamind's `terraform.yml` + `global/ci-roles`): PR → fmt/
+- **CI** (mirrors the prior prototype's `terraform.yml` + `global/ci-roles`): PR → fmt/
   validate/tflint/trivy/test + `plan` matrix over examples via OIDC role
   `agentic-fs-ci-plan` (ReadOnly + state RW; fork PRs run only credential-free
   jobs); merge → auto-apply the sandbox quickstart via `agentic-fs-ci-apply`
@@ -1100,7 +1098,7 @@ pricing.
 
 ## 12. Type-safety & codegen
 
-Mirror of Seamind's `npm run gen` discipline (committed generated artifacts +
+Mirror of the prior prototype's `npm run gen` discipline (committed generated artifacts +
 CI drift gate):
 
 1. pydantic DTOs + `SecuredRouter` declarations →
@@ -1128,7 +1126,7 @@ Revisit only if a high-throughput polyglot RPC consumer appears.
 
 ## 13. DX, docs & local dev
 
-### 13.1 Pre-commit (ported from Seamind, kept fast — no pytest hook)
+### 13.1 Pre-commit (ported from the prior prototype, kept fast — no pytest hook)
 
 ```yaml
 repos:
@@ -1142,7 +1140,7 @@ repos:
       - id: worker-tsc                             # tsc --noEmit + eslint; files: ^workers/mcp-edge/
 ```
 
-The **terraform smart-gate** is the Seamind trick verbatim: a cheap always-run
+The **terraform smart-gate** is the same trick verbatim: a cheap always-run
 hook checks `git diff -- terraform/` and only then invokes the expensive
 `manual`-stage terraform hooks — non-infra commits stay fast.
 

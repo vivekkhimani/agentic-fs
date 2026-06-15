@@ -18,6 +18,8 @@ env:
 
 jobs:
   drift:
+    # Read-only plan against the canonical account; never runs in a fork.
+    if: github.repository_owner == 'vivekkhimani'
     runs-on: ubuntu-latest
     defaults:
       run:

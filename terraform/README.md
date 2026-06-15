@@ -3,8 +3,7 @@
 Infrastructure for agentic-fs, fully modularized and deployed with one
 `terraform apply` per root. Everything is `agentic-fs-*`-named and
 `Project = agentic-fs`-tagged so the whole footprint is isolated, auditable, and
-tearable-down by tag — even while it shares the existing Seamind AWS account
-(`002988089284`) during the trial phase.
+tearable-down by tag — even when it shares an AWS account with other workloads.
 
 > **Status (live).** The guardrail + pipeline layer is in place and the first
 > real modules are applied to the sandbox: `kms`, `storage`, and
@@ -37,7 +36,7 @@ terraform/
 
 S3 remote backend with **native S3 locking** (`use_lockfile = true`, Terraform
 >= 1.10) — no DynamoDB lock table. One state key per root, all in
-`agentic-fs-terraform-state-002988089284` (versioned, SSE, TLS-only).
+`agentic-fs-terraform-state-<account_id>` (versioned, SSE, TLS-only).
 
 | Root | State key |
 |---|---|
@@ -85,11 +84,11 @@ Required before the credentialed CI jobs can run:
 
 | What | Value | Set by |
 |---|---|---|
-| Repo secret `AWS_ACCOUNT_ID` | `002988089284` | `gh secret set` (done during scaffolding) |
+| Repo secret `AWS_ACCOUNT_ID` | your AWS account ID | `gh secret set AWS_ACCOUNT_ID` |
 | Environment `sandbox` | (gates the apply job + scopes the apply role's OIDC trust) | repo Settings → Environments; add required reviewers to enforce manual approval |
 
-The OIDC roles themselves are created by `global/ci-roles`. The account's GitHub
-OIDC provider already exists (shared in `002988089284`).
+The OIDC roles themselves are created by `global/ci-roles`, which also ensures the
+account's GitHub OIDC provider exists.
 
 ## Tagging & teardown
 
