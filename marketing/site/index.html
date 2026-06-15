@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>agentic-fs — a filesystem for AI agents, over your own S3</title>
+    <title>agentic-fs: a filesystem for AI agents, over your own S3</title>
     <meta
       name="description"
-      content="Filesystem-style access to your documents for AI agents — list / glob / grep / read over your own S3, via MCP. Multi-tenant, one terraform apply, ~$2/mo idle, every layer swappable. Apache-2.0."
+      content="Filesystem-style access to your documents for AI agents. list / glob / grep / read over your own S3, via MCP. Multi-tenant, one terraform apply, ~$2/mo idle, every layer swappable. Apache-2.0."
     />
     <meta property="og:title" content="agentic-fs" />
     <meta
@@ -25,13 +25,13 @@
     <main>
       <header class="hero">
         <div class="prompt"><span class="sigil">$</span> agentic-fs</div>
-        <h1>A filesystem for AI agents — over your own S3.</h1>
+        <h1>A filesystem for AI agents, over your own S3.</h1>
         <p class="tagline">
           <code>list</code> / <code>glob</code> / <code>grep</code> /
           <code>tree</code> / ranged <code>read</code> over your documents,
-          exposed through <strong>MCP</strong>. Multi-tenant, one
-          <code>terraform apply</code>, ~<strong>$2/mo</strong> idle, and every
-          stateful layer is swappable.
+          exposed through <strong>MCP</strong>. It's multi-tenant, deploys with one
+          <code>terraform apply</code>, costs ~<strong>$2/mo</strong> idle, and
+          every stateful layer is swappable.
         </p>
         <div class="cta">
           <a class="btn primary" href="https://github.com/vivekkhimani/agentic-fs">GitHub repo →</a>
@@ -44,11 +44,11 @@
         <h2>What it is</h2>
         <p>
           agentic-fs gives an AI agent <em>filesystem-style</em> access to an
-          organization's documents — not a chat box bolted onto a vector store.
-          Your files stay in <strong>your S3</strong> (the single source of
-          truth); a derived catalog makes <code>list</code>/<code>glob</code>/<code>stat</code>
-          fast at scale; and the agent navigates with the same loop a coding
-          agent uses on a repo. Documents (PDF, Office, …) are extracted to text
+          organization's documents. It is not a chat box bolted onto a vector
+          store. Your files stay in <strong>your S3</strong>, the single source of
+          truth; a derived catalog makes <code>list</code>/<code>glob</code>/<code>stat</code>
+          fast at scale; and the agent navigates with the same loop a coding agent
+          uses on a repo. Documents (PDF, Office, and more) are extracted to text,
           so <code>grep</code> and <code>read</code> work on their contents.
         </p>
       </section>
@@ -56,19 +56,19 @@
       <section>
         <h2>Why it's shaped this way</h2>
         <ul class="grid">
-          <li><strong>MCP-first.</strong> A bounded, scoped tool surface any MCP client can attach to — REST too.</li>
+          <li><strong>MCP-first.</strong> A bounded, scoped tool surface any MCP client can attach to, with REST alongside it.</li>
           <li><strong>Grep is the floor.</strong> Two-stage, budgeted search over extracted text. Semantic search is an opt-in accelerator, not a dependency.</li>
-          <li><strong>Multi-tenant &amp; secure.</strong> SSE-KMS everywhere, scope/namespace enforcement, an IdP-agnostic OAuth 2.1 resource server (bring your own IdP).</li>
+          <li><strong>Multi-tenant &amp; secure.</strong> SSE-KMS everywhere, scope and namespace enforcement, an IdP-agnostic OAuth 2.1 resource server (bring your own IdP).</li>
           <li><strong>Healable.</strong> S3 is canonical; the catalog is derived and reconciles back to S3.</li>
-          <li><strong>~$2/mo idle.</strong> Serverless by default — Lambda + S3 + DynamoDB. You pay for what you use.</li>
-          <li><strong>Swappable everything.</strong> Object store, catalog, compute, extraction, connectors, auth — each a small contract with a conformance kit.</li>
+          <li><strong>~$2/mo idle.</strong> Serverless by default on Lambda, S3, and DynamoDB. You pay for what you use.</li>
+          <li><strong>Swappable everything.</strong> Object store, catalog, compute, extraction, connectors, and auth are each a small contract with a conformance kit.</li>
         </ul>
       </section>
 
       <section>
         <h2>The tool surface</h2>
         <pre class="tools">
-whoami        who am I — tenant, scopes, namespaces
+whoami        who am I: tenant, scopes, namespaces
 fs_list       list a namespace
 fs_tree       directory tree (ls -R)
 fs_glob       path globs (**/*.pdf)
@@ -79,7 +79,7 @@ fs_read       ranged read, or by section
 fs_tables     pull tables as structured rows
 fs_diff       diff two documents
 scratch_*     a per-principal scratch workspace</pre>
-        <p class="muted">Tools are pluggable — add your own as an entry point; it inherits scope-enforcement, budgets, and audit for free.</p>
+        <p class="muted">Tools are pluggable. Add your own as an entry point and it inherits scope enforcement, budgets, and audit for free.</p>
       </section>
 
       <section>
@@ -102,15 +102,15 @@ pip install afs-connector-sdk</pre>
       <section id="contribute">
         <h2>Open to contributions</h2>
         <p>
-          The core is built and the platform is designed to grow without forking —
-          new stores, connectors, extractors, and MCP tools are
+          The core is built, and the platform is designed to grow without forking.
+          New stores, connectors, extractors, and MCP tools are
           <em>implement + register</em>, certified by the same conformance kits.
           Good places to start are filed and labelled:
         </p>
         <ul class="grid">
-          <li><a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">good first issues</a> — scoped, self-contained.</li>
-          <li><a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">help wanted</a> — Redis/Valkey cache, Fargate, GuardDuty, a Postgres catalog, semantic search, more connectors.</li>
-          <li><a href="https://github.com/vivekkhimani/agentic-fs/tree/master/docs/swap-guides">swap guides</a> &amp; <a href="https://github.com/vivekkhimani/agentic-fs/tree/master/docs/decisions">decision records</a> — how the seams work and why.</li>
+          <li><a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">good first issues</a>: scoped, self-contained.</li>
+          <li><a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">help wanted</a>: Redis/Valkey cache, Fargate, GuardDuty, a Postgres catalog, semantic search, more connectors.</li>
+          <li><a href="https://github.com/vivekkhimani/agentic-fs/tree/master/docs/swap-guides">swap guides</a> &amp; <a href="https://github.com/vivekkhimani/agentic-fs/tree/master/docs/decisions">decision records</a>: how the seams work and why.</li>
         </ul>
         <p class="muted">Read <a href="https://github.com/vivekkhimani/agentic-fs/blob/master/docs/build-progress.md">build-progress.md</a> for what's done, what's next, and the thinking behind each slice.</p>
       </section>
@@ -118,8 +118,9 @@ pip install afs-connector-sdk</pre>
       <section id="roadmap">
         <h2>What I'd love to do next</h2>
         <p>
-          The core is built; these are the high-value ideas on deck. Each is a
-          filed, scoped issue with acceptance criteria — pick one and run with it.
+          The core is built; these are the high-value ideas on deck. Each one is a
+          filed, scoped issue with acceptance criteria, so you can pick one and run
+          with it.
         </p>
         <ul class="grid">
           <li>
@@ -152,8 +153,8 @@ pip install afs-connector-sdk</pre>
           </li>
         </ul>
         <p class="muted">
-          See the <a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">full open list</a>
-          or open a new idea — discussion welcome.
+          See the <a href="https://github.com/vivekkhimani/agentic-fs/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22">full open list</a>,
+          or open a new idea. Discussion welcome.
         </p>
       </section>
 
@@ -161,12 +162,12 @@ pip install afs-connector-sdk</pre>
         <h2>Acknowledgments</h2>
         <p>agentic-fs stands on ideas others published first:</p>
         <ul class="grid">
-          <li><a href="https://www.mintlify.com/blog/how-we-built-a-virtual-filesystem-for-our-assistant">Mintlify — a virtual filesystem for their assistant</a>: two-stage grep, claims-pruned path tree, read-only semantics.</li>
-          <li>Anthropic — <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">effective context engineering</a> &amp; <a href="https://www.anthropic.com/engineering/code-execution-with-mcp">code execution with MCP</a>.</li>
-          <li>"Grep is the floor" — <a href="https://vadim.blog/claude-code-no-indexing/">Claude Code dropped indexing</a> · <a href="https://jxnl.co/writing/2025/09/11/why-grep-beat-embeddings-in-our-swe-bench-agent-lessons-from-augment/">why grep beat embeddings</a>.</li>
+          <li><a href="https://www.mintlify.com/blog/how-we-built-a-virtual-filesystem-for-our-assistant">Mintlify: a virtual filesystem for their assistant</a>. Two-stage grep, claims-pruned path tree, read-only semantics.</li>
+          <li>Anthropic: <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">effective context engineering</a> &amp; <a href="https://www.anthropic.com/engineering/code-execution-with-mcp">code execution with MCP</a>.</li>
+          <li>"Grep is the floor": <a href="https://vadim.blog/claude-code-no-indexing/">Claude Code dropped indexing</a> · <a href="https://jxnl.co/writing/2025/09/11/why-grep-beat-embeddings-in-our-swe-bench-agent-lessons-from-augment/">why grep beat embeddings</a>.</li>
           <li>Built on <a href="https://modelcontextprotocol.io">MCP</a> · <a href="https://filesystem-spec.readthedocs.io">fsspec</a> · <a href="https://llamahub.ai/">LlamaHub</a> · <a href="https://github.com/DS4SD/docling">Docling</a>.</li>
         </ul>
-        <p class="muted">Fuller reference list in the <a href="https://github.com/vivekkhimani/agentic-fs/blob/master/docs/agentic-fs-oss-plan.md#references">design doc</a>.</p>
+        <p class="muted">A fuller reference list lives in the <a href="https://github.com/vivekkhimani/agentic-fs/blob/master/docs/agentic-fs-oss-plan.md#references">design doc</a>.</p>
       </section>
 
       <footer>
