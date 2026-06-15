@@ -3,7 +3,7 @@ provider "aws" {
   region = "us-east-1"
 
   # Tagged distinctly from the agentic-fs footprint so a `Project=agentic-fs`
-  # teardown-by-tag never sweeps the marketing site.
+  # teardown-by-tag never sweeps the landing site.
   default_tags {
     tags = {
       Project   = "agenticfs-site"

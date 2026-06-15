@@ -1,12 +1,12 @@
-name: Marketing site
+name: Website
 
 # Validate on PR (credential-free); deploy ONLY on a deliberate, owner-gated
 # manual run — a fork or a routine merge never deploys.
 on:
   pull_request:
     paths:
-      - 'marketing/**'
-      - '.github/workflows/marketing.yml'
+      - 'web/**'
+      - '.github/workflows/web.yml'
   workflow_dispatch: {}
 
 permissions:
@@ -27,13 +27,13 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
       - name: Terraform fmt + validate (no backend)
-        working-directory: marketing/infra
+        working-directory: web/infra
         run: |
           terraform fmt -check -recursive
           terraform init -backend=false -input=false
           terraform validate -no-color
       - name: Site sanity check
-        run: test -f marketing/site/index.html && test -f marketing/site/styles.css
+        run: test -f web/site/index.html && test -f web/site/styles.css
 
   deploy:
     if: github.event_name == 'workflow_dispatch' && github.repository_owner == 'vivekkhimani'
@@ -48,7 +48,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Sync site to S3
-        run: aws s3 sync marketing/site/ "s3://${{ vars.SITE_BUCKET }}/" --delete --cache-control "public,max-age=300"
+        run: aws s3 sync web/site/ "s3://${{ vars.SITE_BUCKET }}/" --delete --cache-control "public,max-age=300"
 
       - name: Invalidate CloudFront
         run: aws cloudfront create-invalidation --distribution-id "${{ vars.SITE_DISTRIBUTION_ID }}" --paths '/*'
