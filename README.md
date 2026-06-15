@@ -126,6 +126,19 @@ table, the serving Lambda + Function URL, async ingestion (EventBridge → SQS �
 worker), the scheduled reconciler, and high-signal CloudWatch alarms. One
 `terraform apply`. Start with [`terraform/README.md`](terraform/README.md).
 
+## Acknowledgments & prior art
+
+agentic-fs stands on ideas others published first. The design is most directly
+inspired by:
+
+- **[Mintlify — How we built a virtual filesystem for our assistant](https://www.mintlify.com/blog/how-we-built-a-virtual-filesystem-for-our-assistant)** — the core shape: a virtual filesystem over existing storage, a claims-pruned path tree, **two-stage grep**, read-only semantics, and the sandbox cost framing.
+- **[Anthropic — Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)** and **[Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp)** — bounded, context-efficient tools and the MCP-first surface.
+- **"Grep is the floor"** — [Claude Code dropped indexing for grep](https://vadim.blog/claude-code-no-indexing/) and [why grep beat embeddings (Augment)](https://jxnl.co/writing/2025/09/11/why-grep-beat-embeddings-in-our-swe-bench-agent-lessons-from-augment/); semantic search stays an opt-in accelerator.
+- Ecosystem we build on: the **[Model Context Protocol](https://modelcontextprotocol.io)**, **[fsspec](https://filesystem-spec.readthedocs.io)** (the object-store adapter), **[LlamaHub/LlamaIndex](https://llamahub.ai/)** (the connector adapter), and **[Docling](https://github.com/DS4SD/docling)** (extraction).
+- Adjacent prior art: [Turso AgentFS](https://github.com/tursodatabase/agentfs) · [Onyx](https://onyx.app) · [Ragie](https://www.ragie.ai).
+
+Fuller reference list in [`docs/agentic-fs-oss-plan.md`](docs/agentic-fs-oss-plan.md#references).
+
 ## Learn more
 
 - [`docs/build-progress.md`](docs/build-progress.md) — what's built, what's next, the roadmap
