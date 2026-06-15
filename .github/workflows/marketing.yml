@@ -18,7 +18,7 @@ env:
   TF_VERSION: '1.10.5'
 
 jobs:
-  validate:
+  site-validate:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
