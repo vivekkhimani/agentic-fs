@@ -1,7 +1,7 @@
 # agentic-fs — build progress & roadmap
 
 > A living map from **what we've built** to **the vision** (`agentic-fs-oss-plan.md`).
-> Updated as each slice lands. Last updated: 2026-06-14.
+> Updated as each slice lands. Last updated: 2026-06-15.
 
 ## The vision in one line
 
