@@ -119,6 +119,22 @@ are PEP 561 typed. Packaging, the namespace decision, and the release flow are i
 publish to PyPI on a `vX.Y.Z` tag via Trusted Publishing
 ([`release.yml`](.github/workflows/release.yml)).
 
+## Container images
+
+Prebuilt images are published to GHCR on each release (`v*` tag):
+
+| Image | Pull |
+|---|---|
+| API / server | `docker pull ghcr.io/vivekkhimani/agentic-fs:1.0.0` |
+| Extraction worker (slim: text_native/pdf/docx/textract) | `docker pull ghcr.io/vivekkhimani/agentic-fs-worker:1.0.0` |
+
+`:latest` tracks the most recent release. These run directly on **Fargate,
+Kubernetes, and locally**. One caveat: **AWS Lambda can only pull from ECR in the
+same account**, so for the Lambda path, mirror the image into your ECR first
+(`docker pull` the GHCR image, then tag + push to your repo). Building locally
+still works too (`make dev`, or `docker build`); the worker takes
+`--build-arg AFS_EXTRAS=...` for heavier extractors (e.g. `docling`).
+
 ## Deploy to your AWS account
 
 `terraform/` provisions the whole footprint with per-layer modules and a
