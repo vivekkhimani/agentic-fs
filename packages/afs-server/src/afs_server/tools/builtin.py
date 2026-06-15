@@ -91,17 +91,24 @@ class FsReadTool:
     def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
         @mcp.tool
         async def fs_read(
-            namespace: str, path: str, start_page: int = 1, end_page: int | None = None
+            namespace: str,
+            path: str,
+            start_page: int = 1,
+            end_page: int | None = None,
+            section: str | None = None,
         ) -> dict[str, Any]:
             """Read a bounded page range (<= 20 pages) of a document's extracted text.
 
-            A `catalog_only` document exists and is citeable but isn't readable yet —
+            Pass `section` (a heading from fs_outline) to read just that section's
+            pages instead of a page range — jump straight to the relevant part. A
+            `catalog_only` document exists and is citeable but isn't readable yet —
             you'll get a tool error saying so; you can still reference it by path.
             """
+            ctx = deps.resolve()
+            if section is not None:
+                return await _result(deps.fs.read_section(ctx, namespace, path, section))
             return await _result(
-                deps.fs.read(
-                    deps.resolve(), namespace, path, start_page=start_page, end_page=end_page
-                )
+                deps.fs.read(ctx, namespace, path, start_page=start_page, end_page=end_page)
             )
 
 
@@ -241,6 +248,39 @@ class FsOutlineTool:
             return await _result(
                 deps.fs.outline(deps.resolve(), namespace, path, max_headings=max_headings)
             )
+
+
+class FsTablesTool:
+    name = "fs_tables"
+    required_scopes = frozenset({"fs:read"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def fs_tables(namespace: str, path: str) -> dict[str, Any]:
+            """Extract the tables in a document as structured rows (header + rows + page).
+
+            Surfaces markdown tables from the extracted text (so it works on whatever
+            the extractor produced — best on PDFs/Office via the table-aware rungs).
+            Bounded; `truncated: true` means a table/row/page cap was hit.
+            """
+            return await _result(deps.fs.tables(deps.resolve(), namespace, path))
+
+
+class FsDiffTool:
+    name = "fs_diff"
+    required_scopes = frozenset({"fs:read"})
+    required_capabilities: frozenset[str] = frozenset()
+
+    def register(self, mcp: FastMCP, deps: ToolDeps) -> None:
+        @mcp.tool
+        async def fs_diff(namespace: str, path_a: str, path_b: str) -> dict[str, Any]:
+            """Unified diff between two documents' extracted text (compare two files/versions).
+
+            Reads the first pages of each and returns a bounded unified diff (empty
+            when identical); `truncated: true` means the line budget was hit.
+            """
+            return await _result(deps.fs.diff(deps.resolve(), namespace, path_a, path_b))
 
 
 class ScratchWriteTool:
