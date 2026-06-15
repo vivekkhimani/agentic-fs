@@ -32,7 +32,7 @@ dev = [
     # `[textract]` extra in production).
     "pillow>=10",
     # Lets the suite run the pdftables rung for real (it's the `[pdftables]` extra).
-    "pdfplumber>=0.11",
+    "pdfplumber>=0.11.10",
     # Lets the suite exercise the Haystack engine (it's the `[haystack]` extra).
     "haystack-ai>=2.10",
     # Lets the suite certify the fsspec object store (it's the `[fsspec]` extra).
