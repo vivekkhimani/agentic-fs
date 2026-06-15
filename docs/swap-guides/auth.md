@@ -56,18 +56,30 @@ the JWKS is at `https://api.workos.com/sso/jwks/<client_id>`.
 
 ```bash
 AFS_AUTH_MODE=oidc
-AFS_OIDC_ISSUER=https://api.workos.com/user_management/<client_id>   # your issuer
-AFS_OIDC_JWKS_URI=https://api.workos.com/sso/jwks/<client_id>
-AFS_OIDC_AUDIENCE=<your client_id / configured audience>
+AFS_OIDC_JWKS_URI=https://api.workos.com/sso/jwks/<client_id>   # RS256
 AFS_OIDC_TENANT_CLAIM=org_id          # WorkOS organization → tenant
 AFS_OIDC_SCOPES_CLAIM=permissions     # WorkOS role permissions → scopes
-AFS_OIDC_DEFAULT_NAMESPACES=*         # single-org dogfood: org-wide access
+AFS_OIDC_DEFAULT_NAMESPACES=*         # single-org: org-wide (org_id still isolates)
+# Audience + issuer: see the two token types below.
 ```
 
+WorkOS issues **two** token shapes, and which you validate matters:
+
+- **Session tokens** (AuthKit web sessions, what a BFF attaches to API calls) have
+  **no `aud` claim** — leave `AFS_OIDC_AUDIENCE` unset (don't enforce audience) and
+  `AFS_OIDC_ISSUER` unset or the WorkOS issuer. Fine for a quick check.
+- **Resource-bound tokens** (AuthKit OAuth, the MCP/RFC-8707 flow) carry
+  `aud` = your resource URI and `iss` = your **AuthKit domain** (e.g.
+  `https://auth.your.app`, *not* `api.workos.com`). For an MCP resource server like
+  agentic-fs, prefer these: set `AFS_OIDC_AUDIENCE=<your resource URI>` and
+  `AFS_OIDC_ISSUER=<AuthKit domain>`.
+
 Name your WorkOS role **permissions** exactly `fs:read`, `ingest`, … so they land
-as our scopes. Per-user namespace segmentation needs a custom claim
-(`afs_namespaces`); until then `*` grants org-wide (still isolated by `org_id`).
-Confirm the live claim shape with `afs auth doctor` against a real token.
+as our scopes. **Namespaces:** WorkOS custom JWT-template claims are best avoided
+(template drift / PII / bloat), so don't push an `afs_namespaces` claim — use
+`AFS_OIDC_DEFAULT_NAMESPACES=*` (org-wide, still isolated by `org_id`); reach for
+real segmentation only if a deployment needs it. Confirm the live claim shape with
+`afs auth doctor` against a real token.
 
 ### Amazon Cognito
 
