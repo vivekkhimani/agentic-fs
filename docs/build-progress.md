@@ -184,8 +184,16 @@ it — so the system is demoable at every step (plan §15).
   - **Tier 1 — exploration (free compute)** ✅: **`fs_tree`** (namespace tree),
     **`fs_find`** (glob + content-type/status/size/mtime filters), **`fs_outline`**
     (a document's markdown-heading + page map — a "symbol map for docs"), and
-    **`fs_grep`** gained ripgrep-style **content-type filter** + **files-with-matches**.
-    (Remaining grep flags — count-only/invert/multiline — are easy follow-ons.)
+    **`fs_grep`** gained ripgrep-style **content-type filter** + **files-with-matches**,
+    then **count-only / invert / multiline** (#81), now on a **linear-time RE2 engine**
+    so untrusted patterns can't ReDoS the server ([ADR 0015](decisions/0015-read-path-performance.md)).
+  - **Read-path performance** ([ADR 0015](decisions/0015-read-path-performance.md)):
+    Phase 1 ✅ — **concurrent page fetch** (the read path was N serial S3 GETs),
+    **honest grep truncation** (stage-1 candidate cap now signals `truncated`), and a
+    **literal page-prefilter**. Phase 2 ✅ — **RE2** scan engine + the #81 flags.
+    Phase 3 🔜 — an optional **content coarse-filter index** (in-catalog Bloom/trigram,
+    populated at extraction; Postgres `pg_trgm`/Bedrock on the same seam) to prune the
+    candidate *set* before fetch, plus the deferred Redis tier (#78).
   - **Tier 2 — read deeper (mostly free)** ✅: **`fs_read` by section** (a `section`
     param resolves the outline → that heading's page span); **`fs_tables`** (parses
     markdown tables from extracted text → structured header+rows+page); **`fs_diff`**

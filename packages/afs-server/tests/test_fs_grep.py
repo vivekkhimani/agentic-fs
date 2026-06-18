@@ -114,6 +114,55 @@ async def test_grep_literal_case_insensitive_prefilter() -> None:
     assert none.matches == []
 
 
+async def test_grep_count_only_returns_per_file_counts() -> None:
+    fs = await _seed()
+    res = await fs.grep(CTX, "ns", r"beta", count_only=True)
+    counts = {c.path: c.count for c in res.counts}
+    assert counts == {"a.md": 2, "b.md": 1}  # a.md matches on both pages; c.md has none
+    assert res.matches == []  # count mode emits counts, not lines
+
+
+async def test_grep_invert_emits_non_matching_lines() -> None:
+    fs = await _seed()
+    res = await fs.grep(CTX, "ns", r"beta", invert=True)
+    texts = {m.text for m in res.matches}
+    assert "gamma" in texts  # a line without "beta"
+    assert all("beta" not in m.text.lower() for m in res.matches)
+
+
+async def test_grep_multiline_spans_lines_within_a_page() -> None:
+    fs = await _seed()
+    # "alpha beta\ngamma" — the '.' must cross the newline, so this only matches
+    # under multiline; without it there's no hit.
+    res = await fs.grep(CTX, "ns", r"beta.gamma", multiline=True)
+    assert {(m.path, m.page) for m in res.matches} == {("a.md", 1)}
+    plain = await fs.grep(CTX, "ns", r"beta.gamma")
+    assert plain.matches == []
+
+
+async def test_grep_invert_and_multiline_rejected() -> None:
+    fs = await _seed()
+    with pytest.raises(ValidationError):
+        await fs.grep(CTX, "ns", r"beta", invert=True, multiline=True)
+
+
+async def test_grep_unsupported_regex_construct_is_validation_error() -> None:
+    # RE2 rejects lookaround/backreferences — surfaced as a clean ValidationError,
+    # not a 500. (Under the stdlib `re` fallback these would compile; the base dep
+    # is google-re2, so this is the production behaviour.)
+    fs = await _seed()
+    with pytest.raises(ValidationError):
+        await fs.grep(CTX, "ns", r"(?=beta)")
+
+
+async def test_grep_pathological_pattern_does_not_hang() -> None:
+    # A classic catastrophic-backtracking pattern: linear-time on RE2, so it
+    # returns promptly instead of pinning a CPU.
+    fs = await _seed()
+    res = await fs.grep(CTX, "ns", r"(a+)+$")
+    assert res.files_searched >= 1  # it ran to completion
+
+
 async def test_glob_matches_across_separators() -> None:
     fs = await _seed()
     res = await fs.glob(CTX, "ns", "*.md")

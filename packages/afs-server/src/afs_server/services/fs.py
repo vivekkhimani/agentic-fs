@@ -25,6 +25,7 @@ from afs_server.schemas import (
     FindItem,
     FindResponse,
     GlobResponse,
+    GrepCount,
     GrepMatch,
     GrepResponse,
     OutlineHeading,
@@ -35,6 +36,7 @@ from afs_server.schemas import (
     TablesResponse,
     TreeResponse,
 )
+from afs_server.services._search import Matcher, PatternError, compile_pattern
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -160,6 +162,23 @@ def _render_tree(paths: list[str], prefix: str) -> tuple[str, int, int]:
     return "\n".join(lines), dirs, files
 
 
+def _page_hit_lines(
+    text: str, matcher: Matcher, *, multiline: bool, invert: bool
+) -> tuple[list[str], list[int]]:
+    """The matching lines of one page: ``(lines, sorted 0-based hit indices)``.
+
+    Line mode tests each line (``invert`` flips it — emit non-matching lines).
+    Multiline mode matches over the whole page so ``.`` can span lines, then maps
+    each match's start back to the line it begins on (deduped)."""
+    lines = text.splitlines()
+    if multiline:
+        seen: set[int] = set()
+        for start in matcher.match_starts(text):
+            seen.add(text.count("\n", 0, start))
+        return lines, sorted(seen)
+    return lines, [i for i, line in enumerate(lines) if matcher.search(line) != invert]
+
+
 class FsService:
     def __init__(self, catalog: CatalogStore, objects: ObjectStore) -> None:
         self._catalog = catalog
@@ -272,25 +291,40 @@ class FsService:
         max_matches_per_file: int = MAX_GREP_MATCHES_PER_FILE,
         content_type: str | None = None,
         files_with_matches: bool = False,
+        count_only: bool = False,
+        invert: bool = False,
+        multiline: bool = False,
     ) -> GrepResponse:
         """Two-stage, budgeted regex search over a namespace's derived text.
 
         Stage 1: the catalog narrows candidates by ``path_glob`` (and optionally
         ``content_type``; no full scan). Stage 2: scan those docs' derived text,
-        emitting bounded matches. ``files_with_matches`` returns just the matching
-        paths (and stops at each doc's first hit — cheap discovery). Hitting any
+        emitting bounded results. The pattern runs on a linear-time engine (RE2),
+        so it can't ReDoS — but lookaround/backreferences are unsupported.
+
+        Output modes (precedence: count_only > files_with_matches > matches):
+        ``count_only`` returns per-file match counts; ``files_with_matches`` returns
+        just the matching paths (stops at each doc's first hit — cheap discovery);
+        otherwise individual matches. ``invert`` emits non-matching lines (like
+        ``grep -v``); ``multiline`` lets ``.`` span lines within a page. Hitting any
         budget (files/matches/bytes) sets ``truncated`` — narrow the query.
         """
         self._authorize(ctx, namespace)
+        if invert and multiline:
+            raise ValidationError(
+                "invert and multiline can't be combined (invert is line-oriented)",
+                detail={"pattern": pattern},
+            )
         try:
-            regex = re.compile(pattern, re.IGNORECASE if ignore_case else 0)
-        except re.error as err:
+            matcher = compile_pattern(pattern, ignore_case=ignore_case, multiline=multiline)
+        except PatternError as err:
             raise ValidationError(f"invalid regex: {err}", detail={"pattern": pattern}) from err
         # A literal pattern (no regex metacharacters) lets us prefilter whole pages
-        # with a substring test — skipping splitlines + per-line regex on pages that
-        # can't match. Pure optimization: it never changes which lines match.
+        # with a substring test — skipping the line scan on pages that can't match.
+        # Pure optimization; invalid under invert (a no-literal page is all hits).
         is_literal = pattern == re.escape(pattern)
         literal = (pattern.lower() if ignore_case else pattern) if is_literal else None
+        use_prefilter = literal is not None and not invert
 
         max_files = min(max(1, max_files), MAX_GREP_FILES)
         max_matches = min(max(1, max_matches), MAX_GREP_MATCHES)
@@ -305,14 +339,17 @@ class FsService:
 
         matches: list[GrepMatch] = []
         files: list[str] = []
+        counts: list[GrepCount] = []
         files_searched = 0
         bytes_scanned = 0
         for entry in candidates:
-            if len(matches) >= max_matches or bytes_scanned >= GREP_BYTE_BUDGET:
+            enough_matches = not count_only and len(matches) >= max_matches
+            if bytes_scanned >= GREP_BYTE_BUDGET or enough_matches:
                 truncated = True
                 break
             files_searched += 1
             per_file = 0
+            file_count = 0
             stop_file = False
             page_count = entry.extraction.page_count or 0
             # Fetch in concurrent chunks (not all pages at once) so the byte budget
@@ -327,12 +364,14 @@ class FsService:
                 for page_no, raw in zip(chunk, raws, strict=True):
                     bytes_scanned += len(raw)
                     text = raw.decode("utf-8", "replace")
-                    haystack = text.lower() if ignore_case else text
-                    if literal is not None and literal not in haystack:
+                    if use_prefilter and literal not in (text.lower() if ignore_case else text):
                         continue  # page provably can't match — skip the line scan
-                    lines = text.splitlines()
-                    for i, line in enumerate(lines):
-                        if not regex.search(line):
+                    lines, hit_idxs = _page_hit_lines(
+                        text, matcher, multiline=multiline, invert=invert
+                    )
+                    for i in hit_idxs:
+                        if count_only:
+                            file_count += 1
                             continue
                         if files_with_matches:
                             files.append(entry.path)
@@ -343,7 +382,7 @@ class FsService:
                                 path=entry.path,
                                 page=page_no,
                                 line=i + 1,
-                                text=line[:GREP_LINE_CAP],
+                                text=lines[i][:GREP_LINE_CAP],
                                 before=[
                                     s[:GREP_LINE_CAP] for s in lines[max(0, i - context_lines) : i]
                                 ],
@@ -360,8 +399,14 @@ class FsService:
                         break
                 if stop_file:
                     break
+            if count_only and file_count:
+                counts.append(GrepCount(path=entry.path, count=file_count))
         return GrepResponse(
-            matches=matches, files=files, files_searched=files_searched, truncated=truncated
+            matches=matches,
+            files=files,
+            counts=counts,
+            files_searched=files_searched,
+            truncated=truncated,
         )
 
     async def tree(

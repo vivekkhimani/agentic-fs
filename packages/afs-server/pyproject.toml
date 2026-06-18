@@ -44,6 +44,10 @@ dependencies = [
     # future v6 must be re-validated before it reaches consumers.
     "pypdfium2>=4,<6",
     "python-docx>=1",
+    # Linear-time regex engine (RE2) for fs_grep over untrusted agent/user patterns
+    # — no catastrophic backtracking, so a hostile pattern can't ReDoS the server
+    # (ADR 0015). The service falls back to stdlib `re` if the wheel is absent.
+    "google-re2>=1.1",
 ]
 
 [project.scripts]

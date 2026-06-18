@@ -145,15 +145,25 @@ class FsGrepTool:
             max_matches: int = 100,
             content_type: str | None = None,
             files_with_matches: bool = False,
+            count_only: bool = False,
+            invert: bool = False,
+            multiline: bool = False,
         ) -> dict[str, Any]:
             """Regex-search documents' extracted text in a namespace (two-stage, bounded).
 
-            `pattern` is a regex; `path_glob` narrows which docs are scanned first, and
-            `content_type` filters by MIME (exact or prefix like `application/pdf`).
-            Set `files_with_matches: true` for just the matching paths (cheap discovery).
-            Results are capped (files / matches / bytes); `truncated: true` means a
-            budget was hit — narrow with `path_glob` or a tighter `pattern`. Each hit
-            gives `path` + `page` — pass those to fs_read for the full surrounding text.
+            `pattern` is a regex run on a linear-time engine (RE2) — it can't hang the
+            server, but lookaround/backreferences aren't supported. `path_glob` narrows
+            which docs are scanned first; `content_type` filters by MIME (exact or
+            prefix like `application/pdf`).
+
+            Output modes (precedence: count_only > files_with_matches > matches):
+            `count_only: true` returns per-file match `counts`; `files_with_matches:
+            true` returns just the matching paths (cheap discovery). `invert: true`
+            emits non-matching lines (`grep -v`); `multiline: true` lets `.` span lines
+            within a page (can't be combined with `invert`). Results are capped (files /
+            matches / bytes); `truncated: true` means a budget was hit — narrow with
+            `path_glob` or a tighter `pattern`. Each match gives `path` + `page` — pass
+            those to fs_read for the full surrounding text.
             """
             return await _result(
                 deps.fs.grep(
@@ -167,6 +177,9 @@ class FsGrepTool:
                     max_matches=max_matches,
                     content_type=content_type,
                     files_with_matches=files_with_matches,
+                    count_only=count_only,
+                    invert=invert,
+                    multiline=multiline,
                 )
             )
 

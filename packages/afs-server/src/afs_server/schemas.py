@@ -54,11 +54,17 @@ class GrepMatch(BaseModel):
     after: list[str] = []
 
 
+class GrepCount(BaseModel):
+    path: str
+    count: int  # matching lines in this document (count_only mode)
+
+
 class GrepResponse(BaseModel):
     """Bounded two-stage grep results over a namespace's derived text."""
 
     matches: list[GrepMatch]
     files: list[str] = []  # populated instead of matches in files_with_matches mode
+    counts: list[GrepCount] = []  # populated instead of matches in count_only mode
     files_searched: int
     truncated: bool  # a budget (files/matches/bytes) was hit — narrow the query
 
