@@ -84,6 +84,36 @@ async def test_grep_invalid_regex_is_validation_error() -> None:
         await fs.grep(CTX, "ns", r"(unclosed")
 
 
+async def test_grep_signals_truncation_when_candidate_cap_hit() -> None:
+    # max_files caps stage-1 candidates; grep must report truncated rather than
+    # silently scanning only the first N docs (ADR 0015). "beta" is in a.md + b.md.
+    fs = await _seed()
+    res = await fs.grep(CTX, "ns", r"beta", max_files=1)
+    assert res.files_searched == 1
+    assert res.truncated is True
+
+
+async def test_grep_literal_fast_path_matches_regex_engine() -> None:
+    # A literal pattern takes the page-prefilter path; results must be identical
+    # to a non-literal regex that matches the same text.
+    fs = await _seed()
+    literal = await fs.grep(CTX, "ns", r"beta")
+    regexp = await fs.grep(CTX, "ns", r"b[e]ta")  # same matches, but not literal
+    assert {(m.path, m.page, m.line) for m in literal.matches} == {
+        (m.path, m.page, m.line) for m in regexp.matches
+    }
+
+
+async def test_grep_literal_case_insensitive_prefilter() -> None:
+    # The literal prefilter is case-folded under ignore_case — an upper-case query
+    # still finds lower-case text (and vice versa).
+    fs = await _seed()
+    res = await fs.grep(CTX, "ns", r"BETA", ignore_case=True)
+    assert {m.path for m in res.matches} == {"a.md", "b.md"}
+    none = await fs.grep(CTX, "ns", r"BETA", ignore_case=False)
+    assert none.matches == []
+
+
 async def test_glob_matches_across_separators() -> None:
     fs = await _seed()
     res = await fs.glob(CTX, "ns", "*.md")

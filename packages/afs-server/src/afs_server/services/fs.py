@@ -6,6 +6,7 @@ return 404 (no enumeration) — the load-bearing rules from the plan (§2.1, §6
 
 from __future__ import annotations
 
+import asyncio
 import difflib
 import re
 from fnmatch import fnmatchcase
@@ -53,6 +54,11 @@ MAX_GREP_MATCHES_PER_FILE = 10
 MAX_GREP_CONTEXT_LINES = 5
 GREP_BYTE_BUDGET = 5_000_000  # stop scanning derived text past this
 GREP_LINE_CAP = 300  # truncate each emitted line
+
+# Pages are stored one object per page, so a read/grep is N network GETs. Fetch
+# them concurrently under this bound (ADR 0015) — the serial round-trips, not the
+# scan, are the bottleneck. Caps peak S3 RPS per call; budgets still cap total work.
+PAGE_FETCH_CONCURRENCY = 16
 
 MAX_TREE_ENTRIES = 2000  # paths walked into the tree before truncating
 MAX_FIND_RESULTS = 500
@@ -165,6 +171,23 @@ class FsService:
             # 404, not 403 — a caller cannot tell "not granted" from "does not exist".
             raise NamespaceNotFoundError("namespace not found", detail={"namespace": namespace})
 
+    async def _get_pages(
+        self, tenant_id: str, namespace: str, entry_id: str, page_nos: list[int]
+    ) -> list[bytes]:
+        """Fetch derived-text page objects concurrently (bounded), in input order.
+
+        The store reads block on the network (boto3 + to_thread), so gathering them
+        turns N serial round-trips into ceil(N / PAGE_FETCH_CONCURRENCY) — the
+        read-path's main latency lever (ADR 0015)."""
+        sem = asyncio.Semaphore(PAGE_FETCH_CONCURRENCY)
+
+        async def _one(page_no: int) -> bytes:
+            async with sem:
+                key = keys.derived_text_key(tenant_id, namespace, entry_id, page_no)
+                return await self._objects.get(key)
+
+        return await asyncio.gather(*(_one(p) for p in page_nos))
+
     async def list_entries(
         self,
         ctx: TenantContext,
@@ -211,11 +234,12 @@ class FsService:
             end = start + MAX_READ_PAGES - 1
         truncated = end < page_count or (end_page is not None and end_page > page_count)
 
-        pages: list[ReadPage] = []
-        for page in range(start, end + 1):
-            key = keys.derived_text_key(ctx.tenant_id, namespace, entry.entry_id, page)
-            raw = await self._objects.get(key)
-            pages.append(ReadPage(page=page, text=raw.decode("utf-8")))
+        page_nos = list(range(start, end + 1))
+        raws = await self._get_pages(ctx.tenant_id, namespace, entry.entry_id, page_nos)
+        pages = [
+            ReadPage(page=p, text=raw.decode("utf-8"))
+            for p, raw in zip(page_nos, raws, strict=True)
+        ]
 
         return ReadResponse(
             path=path,
@@ -231,7 +255,7 @@ class FsService:
         """Catalog paths matching a glob (``*`` matches across ``/`` — recursive)."""
         self._authorize(ctx, namespace)
         limit = min(max(1, limit), MAX_GLOB_RESULTS)
-        entries = await self._match_entries(ctx, namespace, pattern, limit)
+        entries, _ = await self._match_entries(ctx, namespace, pattern, limit)
         return GlobResponse(paths=[e.path for e in entries])
 
     async def grep(
@@ -262,13 +286,18 @@ class FsService:
             regex = re.compile(pattern, re.IGNORECASE if ignore_case else 0)
         except re.error as err:
             raise ValidationError(f"invalid regex: {err}", detail={"pattern": pattern}) from err
+        # A literal pattern (no regex metacharacters) lets us prefilter whole pages
+        # with a substring test — skipping splitlines + per-line regex on pages that
+        # can't match. Pure optimization: it never changes which lines match.
+        is_literal = pattern == re.escape(pattern)
+        literal = (pattern.lower() if ignore_case else pattern) if is_literal else None
 
         max_files = min(max(1, max_files), MAX_GREP_FILES)
         max_matches = min(max(1, max_matches), MAX_GREP_MATCHES)
         max_per_file = min(max(1, max_matches_per_file), MAX_GREP_MATCHES_PER_FILE)
         context_lines = min(max(0, context_lines), MAX_GREP_CONTEXT_LINES)
 
-        candidates = await self._match_entries(
+        candidates, truncated = await self._match_entries(
             ctx, namespace, path_glob, max_files, extracted_only=True
         )
         if content_type:
@@ -278,45 +307,58 @@ class FsService:
         files: list[str] = []
         files_searched = 0
         bytes_scanned = 0
-        truncated = False
         for entry in candidates:
             if len(matches) >= max_matches or bytes_scanned >= GREP_BYTE_BUDGET:
                 truncated = True
                 break
             files_searched += 1
             per_file = 0
-            hit_in_file = False
-            for page_no in range(1, (entry.extraction.page_count or 0) + 1):
+            stop_file = False
+            page_count = entry.extraction.page_count or 0
+            # Fetch in concurrent chunks (not all pages at once) so the byte budget
+            # still halts a runaway doc after at most one extra chunk (ADR 0015).
+            for chunk_start in range(1, page_count + 1, PAGE_FETCH_CONCURRENCY):
                 if bytes_scanned >= GREP_BYTE_BUDGET:
                     truncated = True
                     break
-                key = keys.derived_text_key(ctx.tenant_id, namespace, entry.entry_id, page_no)
-                raw = await self._objects.get(key)
-                bytes_scanned += len(raw)
-                lines = raw.decode("utf-8", "replace").splitlines()
-                for i, line in enumerate(lines):
-                    if not regex.search(line):
-                        continue
-                    if files_with_matches:
-                        files.append(entry.path)
-                        hit_in_file = True
-                        break
-                    matches.append(
-                        GrepMatch(
-                            path=entry.path,
-                            page=page_no,
-                            line=i + 1,
-                            text=line[:GREP_LINE_CAP],
-                            before=[
-                                s[:GREP_LINE_CAP] for s in lines[max(0, i - context_lines) : i]
-                            ],
-                            after=[s[:GREP_LINE_CAP] for s in lines[i + 1 : i + 1 + context_lines]],
+                chunk_end = min(chunk_start + PAGE_FETCH_CONCURRENCY, page_count + 1)
+                chunk = list(range(chunk_start, chunk_end))
+                raws = await self._get_pages(ctx.tenant_id, namespace, entry.entry_id, chunk)
+                for page_no, raw in zip(chunk, raws, strict=True):
+                    bytes_scanned += len(raw)
+                    text = raw.decode("utf-8", "replace")
+                    haystack = text.lower() if ignore_case else text
+                    if literal is not None and literal not in haystack:
+                        continue  # page provably can't match — skip the line scan
+                    lines = text.splitlines()
+                    for i, line in enumerate(lines):
+                        if not regex.search(line):
+                            continue
+                        if files_with_matches:
+                            files.append(entry.path)
+                            stop_file = True
+                            break
+                        matches.append(
+                            GrepMatch(
+                                path=entry.path,
+                                page=page_no,
+                                line=i + 1,
+                                text=line[:GREP_LINE_CAP],
+                                before=[
+                                    s[:GREP_LINE_CAP] for s in lines[max(0, i - context_lines) : i]
+                                ],
+                                after=[
+                                    s[:GREP_LINE_CAP] for s in lines[i + 1 : i + 1 + context_lines]
+                                ],
+                            )
                         )
-                    )
-                    per_file += 1
-                    if per_file >= max_per_file or len(matches) >= max_matches:
+                        per_file += 1
+                        if per_file >= max_per_file or len(matches) >= max_matches:
+                            stop_file = True
+                            break
+                    if stop_file:
                         break
-                if hit_in_file or per_file >= max_per_file or len(matches) >= max_matches:
+                if stop_file:
                     break
         return GrepResponse(
             matches=matches, files=files, files_searched=files_searched, truncated=truncated
@@ -425,12 +467,12 @@ class FsService:
         scan_pages = min(page_count, MAX_OUTLINE_PAGES)
         headings: list[OutlineHeading] = []
         truncated = page_count > scan_pages
-        for page_no in range(1, scan_pages + 1):
+        page_nos = list(range(1, scan_pages + 1))
+        raws = await self._get_pages(ctx.tenant_id, namespace, entry.entry_id, page_nos)
+        for page_no, raw in zip(page_nos, raws, strict=True):
             if len(headings) >= max_headings:
                 truncated = True
                 break
-            key = keys.derived_text_key(ctx.tenant_id, namespace, entry.entry_id, page_no)
-            raw = await self._objects.get(key)
             for line in raw.decode("utf-8", "replace").splitlines():
                 m = _HEADING_RE.match(line)
                 if not m:
@@ -482,12 +524,12 @@ class FsService:
         scan_pages = min(page_count, MAX_TABLE_PAGES)
         out: list[Table] = []
         truncated = page_count > scan_pages
-        for page_no in range(1, scan_pages + 1):
+        page_nos = list(range(1, scan_pages + 1))
+        raws = await self._get_pages(ctx.tenant_id, namespace, entry.entry_id, page_nos)
+        for page_no, raw in zip(page_nos, raws, strict=True):
             if len(out) >= MAX_TABLES:
                 truncated = True
                 break
-            key = keys.derived_text_key(ctx.tenant_id, namespace, entry.entry_id, page_no)
-            raw = await self._objects.get(key)
             for header, rows in _parse_md_tables(raw.decode("utf-8", "replace")):
                 if len(rows) > MAX_TABLE_ROWS:
                     truncated = True
@@ -533,24 +575,33 @@ class FsService:
         limit: int,
         *,
         extracted_only: bool = False,
-    ) -> list[CatalogEntry]:
+    ) -> tuple[list[CatalogEntry], bool]:
         """The coarse filter: catalog entries whose path matches ``pattern``. Narrows
-        the catalog query to the glob's literal prefix, then fnmatches the full path."""
+        the catalog query to the glob's literal prefix, then fnmatches the full path.
+
+        Returns ``(entries, capped)`` — ``capped`` is True when a further matching
+        entry existed beyond ``limit`` (so callers can report honest truncation
+        instead of silently scanning only the first ``limit`` docs — ADR 0015)."""
         prefix = _glob_prefix(pattern)
         out: list[CatalogEntry] = []
+        capped = False
         cursor: str | None = None
-        while len(out) < limit:
+        while True:
             page = await self._catalog.list_entries(
                 ctx.tenant_id, namespace, prefix=prefix, cursor=cursor, limit=100
             )
             for entry in page.items:
                 if extracted_only and entry.extraction.status != "extracted":
                     continue
-                if fnmatchcase(entry.path, pattern):
-                    out.append(entry)
-                    if len(out) >= limit:
-                        break
+                if not fnmatchcase(entry.path, pattern):
+                    continue
+                if len(out) >= limit:
+                    capped = True  # a (limit+1)-th match exists — more than we'll return
+                    break
+                out.append(entry)
+            if capped:
+                break
             cursor = page.next_cursor
             if not cursor:
                 break
-        return out
+        return out, capped
