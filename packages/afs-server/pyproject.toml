@@ -78,7 +78,7 @@ openai = ["openai>=1.50", "pillow>=10"]
 # Haystack pipeline engine (ADR 0010) — configurable, branching extraction
 # pipelines (routers, YAML). Opt-in via AFS_PIPELINE_ENGINE=haystack until it
 # becomes the default; the core install is light (no ML).
-haystack = ["haystack-ai>=2.10"]
+haystack = ["haystack-ai>=2.30.2"]
 # Reserved for future backends. Intentionally empty until the dependencies
 # exist — declaring the names now keeps the install surface stable.
 # TODO: add the Postgres catalog backend deps when that store lands.
